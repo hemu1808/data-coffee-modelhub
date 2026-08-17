@@ -6,11 +6,23 @@ import { useChatStore } from '../../store/useChatStore';
 import { useUserStore } from '../../store/useUserStore';
 import { Avatar } from '../ui/avatar';
 import { AppView, Chat } from '../../types';
-import { PlusIcon, SearchIcon, PinFilledIcon, ChatBubbleIcon, BillingIcon, TeamIcon, LockIcon, TrashIcon, CommandIcon } from '../icons';
+import {
+  PlusIcon,
+  SearchIcon,
+  PinFilledIcon,
+  ChatBubbleIcon,
+  BillingIcon,
+  TeamIcon,
+  ArenaIcon,
+  LockIcon,
+  TrashIcon,
+  KeyIcon,
+} from '../icons';
 import { MOCK_MODELS } from '../../data/mock';
 
 const NAV_ITEMS: { key: AppView; label: string; icon: any }[] = [
   { key: 'chat',    label: 'Chats',            icon: ChatBubbleIcon },
+  { key: 'arena',   label: 'Model Arena',      icon: ArenaIcon },
   { key: 'collabs', label: 'Workspaces',       icon: TeamIcon },
   { key: 'billing', label: 'Usage & billing',  icon: BillingIcon },
 ];
@@ -18,7 +30,7 @@ const NAV_ITEMS: { key: AppView; label: string; icon: any }[] = [
 export function Sidebar() {
   const { sidebarOpen, activeView, setActiveView, isTempChatActive, setIsTempChatActive } = useUIStore();
   const { chats, currentChatId, setCurrentChatId, togglePinChat, createNewChat, deleteChat } = useChatStore();
-  const { user } = useUserStore();
+  const { user, setKeyModalOpen, apiKeys } = useUserStore();
 
   const [search, setSearch] = useState('');
   const [pinnedOpen, setPinnedOpen] = useState(true);
@@ -30,6 +42,8 @@ export function Sidebar() {
   );
   const pinned  = filtered.filter((c) => c.pinned);
   const recent  = filtered.filter((c) => !c.pinned);
+
+  const hasConfiguredKeys = Boolean(apiKeys.openai || apiKeys.anthropic || apiKeys.google);
 
   if (!sidebarOpen) return null;
 
@@ -70,14 +84,14 @@ export function Sidebar() {
       {(activeView === 'chat' || activeView === 'team-chats') && (
         <div className="flex-1 flex flex-col min-h-0 border-t border-hub-border mt-1">
           {/* Action buttons */}
-          <div className="px-2 pt-2 pb-1 flex flex-col gap-1.5">
+          <div className="px-2 pt-2.5 pb-1 flex flex-col gap-2">
             <div className="grid grid-cols-2 gap-1.5">
               <button
                 onClick={() => {
                   setIsTempChatActive(false);
                   createNewChat();
                 }}
-                className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-hub-sm text-hub-xs font-semibold text-hub-accent hover:bg-hub-hover transition-colors border border-hub-accent/20"
+                className="h-8 flex items-center justify-center gap-1.5 px-2 rounded-[8px] text-xs font-semibold text-hub-accent hover:bg-hub-hover transition-colors border border-hub-accent/25"
               >
                 <PlusIcon size={13} />
                 New Chat
@@ -88,10 +102,10 @@ export function Sidebar() {
                   setIsTempChatActive(true);
                   setActiveView('chat');
                 }}
-                className={`flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-hub-sm text-hub-xs font-semibold transition-colors border ${
+                className={`h-8 flex items-center justify-center gap-1.5 px-2 rounded-[8px] text-xs font-semibold transition-colors border ${
                   isTempChatActive
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : 'text-amber-400 hover:bg-hub-hover border-amber-500/20'
+                    : 'text-amber-400 hover:bg-hub-hover border-amber-500/25'
                 }`}
                 title="Start an ephemeral, un-saved conversation"
               >
@@ -101,21 +115,19 @@ export function Sidebar() {
             </div>
 
             {/* Search Input */}
-            <div className="relative">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-hub-text-muted">
-                <SearchIcon size={13} />
-              </span>
+            <div className="relative flex items-center">
+              <SearchIcon size={13} className="absolute left-2.5 text-hub-text-muted pointer-events-none" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search chats…"
-                className="w-full h-7.5 pl-8 pr-3 rounded-hub-sm bg-hub-bg border border-hub-border text-hub-xs text-hub-text placeholder:text-hub-text-muted outline-none focus:border-hub-accent/60 transition-colors"
+                className="w-full h-8 pl-8 pr-3 rounded-[8px] bg-hub-bg border border-hub-border text-xs text-hub-text placeholder:text-hub-text-muted outline-none focus:border-hub-accent/60 transition-colors"
               />
             </div>
           </div>
 
           {/* Chat List */}
-          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5 mt-1">
             {pinned.length > 0 && (
               <ChatGroup label="Pinned" open={pinnedOpen} onToggle={() => setPinnedOpen(!pinnedOpen)}>
                 {pinned.map((c) => (
@@ -154,14 +166,35 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* Spacer when not on Chat view */}
+      {activeView !== 'chat' && activeView !== 'team-chats' && <div className="flex-1" />}
+
+      {/* BYOK API Key Button */}
+      <div className="px-2 pb-1 border-t border-hub-border/50 pt-2">
+        <button
+          onClick={() => setKeyModalOpen(true)}
+          className="w-full flex items-center justify-between px-3 py-1.5 rounded-[8px] text-xs font-medium text-hub-text-sec hover:text-hub-text hover:bg-hub-hover transition-colors"
+        >
+          <span className="flex items-center gap-2">
+            <KeyIcon size={13} className={hasConfiguredKeys ? 'text-hub-accent' : 'text-hub-text-muted'} />
+            API Keys (BYOK)
+          </span>
+          <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full ${hasConfiguredKeys ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 'bg-hub-panel text-hub-text-muted border border-hub-border'}`}>
+            {hasConfiguredKeys ? 'Configured' : 'Auto'}
+          </span>
+        </button>
+      </div>
+
       {/* User Footer */}
-      <div className="shrink-0 flex items-center gap-2.5 px-3 py-3 border-t border-hub-border">
-        <Avatar initials={user.avatar} size="sm" />
-        <div className="flex-1 min-w-0">
-          <div className="text-hub-sm font-medium truncate">{user.name}</div>
-          <div className="text-hub-xs text-hub-text-muted truncate">{user.plan}</div>
+      <div className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 border-t border-hub-border bg-hub-side">
+        <div className="shrink-0">
+          <Avatar initials={user.avatar} size="sm" />
         </div>
-        <span className="text-hub-xs text-hub-accent font-semibold">${user.creditsRemaining.toFixed(2)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-xs font-semibold text-hub-text truncate leading-snug">{user.name}</div>
+          <div className="text-[11px] text-hub-text-muted truncate leading-tight">{user.plan}</div>
+        </div>
+        <span className="text-xs text-hub-accent font-bold shrink-0 font-mono tracking-tight">${user.creditsRemaining.toFixed(2)}</span>
       </div>
     </aside>
   );
@@ -172,7 +205,7 @@ function ChatGroup({ label, open, onToggle, children }: { label: string; open: b
     <div>
       <button
         onClick={onToggle}
-        className="flex items-center gap-1.5 px-2 py-1.5 w-full text-hub-xs font-semibold text-hub-text-muted uppercase tracking-wide hover:text-hub-text-sec transition-colors"
+        className="flex items-center gap-1.5 px-2 py-1.5 w-full text-[10.5px] font-semibold text-hub-text-muted uppercase tracking-wide hover:text-hub-text-sec transition-colors"
       >
         <span>{open ? '▼' : '▶'}</span>
         {label}

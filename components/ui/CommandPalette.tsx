@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { useChatStore } from '../../store/useChatStore';
-import { SearchIcon, LockIcon, PlusIcon, ChatBubbleIcon, TeamIcon, BillingIcon } from '../icons';
+import { useUserStore } from '../../store/useUserStore';
+import { SearchIcon, LockIcon, PlusIcon, ChatBubbleIcon, TeamIcon, BillingIcon, ArenaIcon, KeyIcon } from '../icons';
 import { MOCK_MODELS } from '../../data/mock';
 
 export function CommandPalette() {
@@ -13,6 +14,7 @@ export function CommandPalette() {
 
   const { setActiveView, setSelectedModelId, setIsTempChatActive } = useUIStore();
   const { createNewChat, chats, setCurrentChatId } = useChatStore();
+  const { setKeyModalOpen } = useUserStore();
 
   // Listen for Ctrl+K / Cmd+K
   useEffect(() => {
@@ -58,6 +60,26 @@ export function CommandPalette() {
       perform: () => {
         setIsTempChatActive(true);
         setActiveView('chat');
+        setOpen(false);
+      },
+    },
+    {
+      id: 'act_keys',
+      label: 'Configure API Keys (BYOK - OpenAI, Anthropic, Gemini)',
+      category: 'Settings',
+      icon: KeyIcon,
+      perform: () => {
+        setKeyModalOpen(true);
+        setOpen(false);
+      },
+    },
+    {
+      id: 'nav_arena',
+      label: 'Go to Model Arena (Side-by-Side Benchmark)',
+      category: 'Navigation',
+      icon: ArenaIcon,
+      perform: () => {
+        setActiveView('arena');
         setOpen(false);
       },
     },

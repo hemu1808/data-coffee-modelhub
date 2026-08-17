@@ -6,6 +6,7 @@ import { useChatStore } from '../../store/useChatStore';
 import { ModelPicker } from './ModelPicker';
 import { PaperclipIcon, SendIcon, XIcon, DocIcon } from '../icons';
 import { MOCK_MODELS } from '../../data/mock';
+import { parseUploadedFile } from '../../lib/documentParser';
 
 interface ComposerProps {
   input: string;
@@ -38,11 +39,12 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      Array.from(e.target.files).forEach((file) => {
-        addPendingFile(file.name);
-      });
+      for (const file of Array.from(e.target.files)) {
+        const parsed = await parseUploadedFile(file);
+        addPendingFile(file.name, parsed);
+      }
       e.target.value = '';
     }
   };
@@ -61,12 +63,12 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
           {pendingFiles.map((f) => (
             <span
               key={f}
-              className="inline-flex items-center gap-1.5 bg-hub-hover rounded-full px-2.5 py-1 text-hub-xs text-hub-text-sec"
+              className="inline-flex items-center gap-1.5 bg-hub-hover rounded-full px-2.5 py-1 text-hub-xs text-hub-text-sec border border-hub-border/60"
             >
               <DocIcon size={12} /> {f}
               <button
                 onClick={() => removePendingFile(f)}
-                className="hover:text-red-400 transition-colors"
+                className="hover:text-red-400 transition-colors ml-0.5"
                 title="Remove file"
               >
                 <XIcon size={10} />
@@ -84,13 +86,13 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
           onChange={handleFileUpload}
           hidden
           multiple
-          accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
+          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.ts,.js,.py"
         />
 
         <button
           onClick={() => fileInputRef.current?.click()}
           className="shrink-0 p-2 rounded-hub-sm text-hub-text-muted hover:text-hub-text hover:bg-hub-hover transition-colors"
-          title="Attach document"
+          title="Attach document / code file"
           aria-label="Attach document"
         >
           <PaperclipIcon size={16} />
@@ -111,7 +113,7 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
         <div className="relative">
           <button
             onClick={() => setPickerOpen(!pickerOpen)}
-            className="shrink-0 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-hub-xs font-medium hover:bg-hub-hover transition-colors"
+            className="shrink-0 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-hub-xs font-medium hover:bg-hub-hover transition-colors border border-hub-border/40"
             aria-label="Select model"
           >
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: currentModel.color }} />
@@ -124,7 +126,7 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
         <button
           onClick={onSend}
           disabled={(!input.trim() && pendingFiles.length === 0) || isStreaming}
-          className="shrink-0 h-8 w-8 rounded-hub-sm flex items-center justify-center bg-hub-accent text-white disabled:opacity-30 hover:bg-hub-accent-hi transition-colors"
+          className="shrink-0 h-8 w-8 rounded-hub-sm flex items-center justify-center bg-hub-accent text-white disabled:opacity-30 hover:bg-hub-accent-hi transition-colors shadow-sm"
           aria-label="Send message"
         >
           <SendIcon size={14} />

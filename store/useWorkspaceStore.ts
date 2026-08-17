@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Workspace } from '../types';
+import { Workspace, WorkspaceDoc } from '../types';
 import { MOCK_WORKSPACES } from '../data/mock';
 
 interface WorkspaceState {
@@ -7,7 +7,7 @@ interface WorkspaceState {
   currentWorkspaceId: string;
 
   setCurrentWorkspaceId: (id: string) => void;
-  addTeamDocument: (workspaceId: string, doc: { name: string; info: string; uploadedBy: string }) => void;
+  addTeamDocument: (workspaceId: string, doc: WorkspaceDoc) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({

@@ -78,9 +78,6 @@ export function ChatArea() {
               <MessageBubble key={msg.id} message={msg} />
             ))}
 
-            {isStreaming && (
-              <TypingIndicator modelColor={currentModel.color} modelName={currentModel.name} />
-            )}
 
             <div ref={bottomRef} />
           </div>

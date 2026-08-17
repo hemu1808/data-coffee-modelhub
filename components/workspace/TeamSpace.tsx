@@ -3,9 +3,13 @@
 import React, { useState } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { useWorkspaceStore } from '../../store/useWorkspaceStore';
-import { SafeHTML } from '../ui/SafeHTML';
+import { useUserStore } from '../../store/useUserStore';
+import { MarkdownRenderer } from '../ui/MarkdownRenderer';
 import { Workspace, WorkspaceDoc, WorkspaceMember, ChatMessage } from '../../types';
 import { MOCK_MODELS } from '../../data/mock';
+import { parseUploadedFile } from '../../lib/documentParser';
+import { streamChatMessage } from '../../services/api';
+import { useToast } from '../ui/Toast';
 
 export function TeamSpace() {
   const activeView = useUIStore((state) => state.activeView);
@@ -16,11 +20,14 @@ export function TeamSpace() {
   const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
   const setCurrentWorkspaceId = useWorkspaceStore((state) => state.setCurrentWorkspaceId);
   const addTeamDocument = useWorkspaceStore((state) => state.addTeamDocument);
+  const { apiKeys, deductUsage } = useUserStore();
+  const toast = useToast();
 
   const [activeTeamChatIndex, setActiveTeamChatIndex] = useState<number | null>(0);
   const [selectedTeamDocs, setSelectedTeamDocs] = useState<string[]>([]);
   const [docFilter, setDocFilter] = useState('');
   const [teamInputText, setTeamInputText] = useState('');
+  const [isTeamStreaming, setIsTeamStreaming] = useState(false);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('Editor');
@@ -43,41 +50,78 @@ export function TeamSpace() {
     );
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      Array.from(e.target.files).forEach((file) => {
+      for (const file of Array.from(e.target.files)) {
+        const parsed = await parseUploadedFile(file);
         addTeamDocument(currentWorkspace.id, {
           name: file.name,
-          info: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+          info: parsed.size || `${Math.max(1, Math.round(file.size / 1024))} KB`,
           uploadedBy: 'You',
+          content: parsed.content,
         });
-      });
+      }
+      toast.success(`Uploaded ${e.target.files.length} document(s) to ${currentWorkspace.name}`);
       e.target.value = '';
     }
   };
 
-  const handleSendTeamMessage = () => {
-    if (!teamInputText.trim() && selectedTeamDocs.length === 0) return;
+  const handleSendTeamMessage = async () => {
+    const trimmed = teamInputText.trim();
+    if ((!trimmed && selectedTeamDocs.length === 0) || isTeamStreaming || !activeChat) return;
 
     const userMsg: ChatMessage = {
       id: `tm-${Date.now()}`,
       role: 'user',
-      content: teamInputText || 'Please review the selected team documents.',
+      content: trimmed || 'Please review the selected team documents.',
       files: [...selectedTeamDocs],
+      createdAt: new Date().toISOString(),
     };
 
-    if (activeChat) {
-      activeChat.messages.push(userMsg);
-      activeChat.messages.push({
-        id: `tm-reply-${Date.now()}`,
-        role: 'assistant',
-        model: selectedModelId,
-        content: '<p>I reviewed the shared workspace context and selected documents. Here is a coordinated response the team can continue working from.</p>',
-      });
-    }
+    const assistantMsgId = `tm-reply-${Date.now()}`;
+    const initialAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      model: selectedModelId,
+      content: '',
+      createdAt: new Date().toISOString(),
+    };
 
+    activeChat.messages.push(userMsg, initialAssistantMsg);
     setTeamInputText('');
     setSelectedTeamDocs([]);
+    setIsTeamStreaming(true);
+    deductUsage(trimmed || 'Team Document Analysis', 1.5);
+
+    try {
+      const selectedAttachments = currentWorkspace.documents
+        .filter((d) => userMsg.files?.includes(d.name))
+        .map((d) => ({ name: d.name, content: d.content || d.info }));
+
+      await streamChatMessage(
+        {
+          prompt: userMsg.content,
+          model: selectedModelId,
+          attachments: selectedAttachments,
+          apiKeys,
+        },
+        (accumulatedText) => {
+          const targetMsg = activeChat.messages.find((m) => m.id === assistantMsgId);
+          if (targetMsg) {
+            targetMsg.content = accumulatedText;
+            // Trigger local re-render by updating state shallowly
+            setIsTeamStreaming(true);
+          }
+        }
+      );
+    } catch {
+      const targetMsg = activeChat.messages.find((m) => m.id === assistantMsgId);
+      if (targetMsg) {
+        targetMsg.content = '**Error**: Workspace AI response interrupted. Please try again.';
+      }
+    } finally {
+      setIsTeamStreaming(false);
+    }
   };
 
   const handleCopyLink = () => {
@@ -302,7 +346,7 @@ export function TeamSpace() {
                           </div>
                         )}
                         <div className="bg-hub-panel border border-hub-border rounded-[12px] p-3.5 shadow-sm">
-                          <SafeHTML html={m.content} />
+                          <MarkdownRenderer content={m.content} />
                         </div>
                       </div>
                     </div>
@@ -322,14 +366,20 @@ export function TeamSpace() {
                   rows={1}
                   value={teamInputText}
                   onChange={(e) => setTeamInputText(e.target.value)}
-                  placeholder="Message your team workspace…"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendTeamMessage();
+                    }
+                  }}
+                  placeholder="Message your team workspace… (Enter to send)"
                   className="w-full bg-transparent border-none outline-none resize-none text-hub-text placeholder:text-hub-text-muted text-[14px] leading-relaxed max-h-[160px]"
                 />
                 <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-hub-border/60">
                   <span className="text-[11px] text-hub-text-muted">Visible to workspace members</span>
                   <button
                     onClick={handleSendTeamMessage}
-                    disabled={!teamInputText.trim() && selectedTeamDocs.length === 0}
+                    disabled={(!teamInputText.trim() && selectedTeamDocs.length === 0) || isTeamStreaming}
                     className="w-[34px] h-[34px] rounded-[9px] bg-hub-accent hover:bg-hub-accent-hi text-white flex items-center justify-center font-bold text-sm disabled:bg-hub-hover disabled:text-hub-text-muted disabled:cursor-not-allowed transition-all active:scale-95"
                   >
                     ↑
@@ -430,6 +480,7 @@ export function TeamSpace() {
                 onClick={() => {
                   setInviteModalOpen(false);
                   setInviteEmail('');
+                  toast.success('Invitation sent to teammate');
                 }}
                 className="bg-hub-accent hover:bg-hub-accent-hi text-white rounded-[9px] px-4 py-2 text-xs font-semibold transition-all duration-200 shadow-md shadow-hub-accent/20 active:scale-95"
               >

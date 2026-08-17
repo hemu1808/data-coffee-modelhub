@@ -189,3 +189,27 @@ export function TeamIcon({ size = 15, className }: IconProps) {
     </svg>
   );
 }
+
+export function ArenaIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.5 17.5L3 6V3h3l11.5 11.5m-3-11.5l6.5 6.5-2 2-6.5-6.5 2-2zM3 21l3.5-3.5m0 0L4 15l2.5-2.5 2.5 2.5-2.5 2.5z" />
+    </svg>
+  );
+}
+
+export function KeyIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.6" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a4 4 0 11-8 0 4 4 0 018 0zM12 14v7m-3-3h6" />
+    </svg>
+  );
+}
+
+export function ZapIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  );
+}

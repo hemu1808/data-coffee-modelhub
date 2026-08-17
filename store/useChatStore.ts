@@ -1,18 +1,20 @@
 import { create } from 'zustand';
-import { Chat, ChatMessage } from '../types';
+import { Chat, ChatMessage, FileAttachment } from '../types';
 import { MOCK_CHATS } from '../data/mock';
 
 interface ChatState {
   chats: Chat[];
   currentChatId: string | null;
   pendingFiles: string[];
+  pendingAttachments: FileAttachment[];
 
   setCurrentChatId: (id: string | null) => void;
   addChat: (chat: Chat) => void;
   deleteChat: (id: string) => void;
   togglePinChat: (id: string) => void;
   addMessageToChat: (chatId: string, message: ChatMessage) => void;
-  addPendingFile: (filename: string) => void;
+  updateMessageContent: (chatId: string, messageId: string, content: string) => void;
+  addPendingFile: (filename: string, attachment?: FileAttachment) => void;
   removePendingFile: (filename: string) => void;
   clearPendingFiles: () => void;
   createNewChat: () => void;
@@ -22,6 +24,7 @@ export const useChatStore = create<ChatState>((set) => ({
   chats: MOCK_CHATS,
   currentChatId: 'chat_1',
   pendingFiles: [],
+  pendingAttachments: [],
 
   setCurrentChatId: (id) => set({ currentChatId: id }),
 
@@ -57,21 +60,41 @@ export const useChatStore = create<ChatState>((set) => ({
       ),
     })),
 
-  addPendingFile: (filename) =>
+  updateMessageContent: (chatId, messageId, content) =>
+    set((state) => ({
+      chats: state.chats.map((c) =>
+        c.id === chatId
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === messageId ? { ...m, content } : m
+              ),
+              updatedAt: new Date().toISOString(),
+            }
+          : c
+      ),
+    })),
+
+  addPendingFile: (filename, attachment) =>
     set((state) => ({
       pendingFiles: state.pendingFiles.includes(filename) ? state.pendingFiles : [...state.pendingFiles, filename],
+      pendingAttachments: attachment
+        ? [...state.pendingAttachments.filter((a) => a.name !== filename), attachment]
+        : state.pendingAttachments,
     })),
 
   removePendingFile: (filename) =>
     set((state) => ({
       pendingFiles: state.pendingFiles.filter((f) => f !== filename),
+      pendingAttachments: state.pendingAttachments.filter((a) => a.name !== filename),
     })),
 
-  clearPendingFiles: () => set({ pendingFiles: [] }),
+  clearPendingFiles: () => set({ pendingFiles: [], pendingAttachments: [] }),
 
   createNewChat: () =>
     set({
       currentChatId: null,
       pendingFiles: [],
+      pendingAttachments: [],
     }),
 }));

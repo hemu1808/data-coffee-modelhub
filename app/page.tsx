@@ -4,10 +4,12 @@ import React from 'react';
 import { useUIStore } from '../store/useUIStore';
 import { Sidebar } from '../components/layout/Sidebar';
 import { ChatArea } from '../components/chat/ChatArea';
+import { ModelArena } from '../components/arena/ModelArena';
 import { UsageDashboard } from '../components/dashboard/UsageDashboard';
 import { TeamSpace } from '../components/workspace/TeamSpace';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { CommandPalette } from '../components/ui/CommandPalette';
+import { ApiKeyModal } from '../components/settings/ApiKeyModal';
 
 export default function Home() {
   const activeView = useUIStore((state) => state.activeView);
@@ -20,11 +22,13 @@ export default function Home() {
       <main className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         <ErrorBoundary>
           {activeView === 'chat' && <ChatArea />}
+          {activeView === 'arena' && <ModelArena />}
           {activeView === 'billing' && <UsageDashboard />}
           {(activeView === 'collabs' || activeView === 'team-chats') && <TeamSpace />}
         </ErrorBoundary>
       </main>
       <CommandPalette />
+      <ApiKeyModal />
     </div>
   );
 }

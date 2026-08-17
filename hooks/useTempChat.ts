@@ -5,18 +5,16 @@ import { ChatMessage } from '../types';
 import { useUIStore } from '../store/useUIStore';
 import { useUserStore } from '../store/useUserStore';
 import { useChatStore } from '../store/useChatStore';
-import { sendMessage } from '../services/api';
+import { streamChatMessage } from '../services/api';
 import { MOCK_MODELS } from '../data/mock';
 
 /**
  * Isolated Temporary Chat Hook
- * 
- * Manages an isolated conversation in component memory only.
- * Messages are NEVER stored in persistent stores or history unless explicitly "Saved to Chats".
+ * Manages an ephemeral conversation in component memory only.
  */
 export function useTempChat() {
   const { selectedModelId, setIsTempChatActive } = useUIStore();
-  const { deductUsage } = useUserStore();
+  const { deductUsage, apiKeys } = useUserStore();
   const { addChat } = useChatStore();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -37,43 +35,54 @@ export function useTempChat() {
       createdAt: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    const assistantMsgId = `temp_a_${Date.now()}`;
+    const initialAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      model: selectedModelId,
+      content: '',
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
     setInput('');
     setIsStreaming(true);
 
     deductUsage(trimmed, 1.2);
 
     try {
-      const res = await sendMessage({
-        prompt: trimmed,
-        model: selectedModelId,
-      });
+      const historyContext = messages.slice(-6).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-      const assistantMsg: ChatMessage = {
-        id: `temp_a_${Date.now()}`,
-        role: 'assistant',
-        model: selectedModelId,
-        content: res.content,
-        createdAt: new Date().toISOString(),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      deductUsage(res.content, 1.8);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
+      await streamChatMessage(
         {
-          id: `temp_err_${Date.now()}`,
-          role: 'assistant',
+          prompt: trimmed,
           model: selectedModelId,
-          content: '<p class="text-red-400">Network error — please try again.</p>',
-          createdAt: new Date().toISOString(),
+          apiKeys,
+          history: historyContext,
         },
-      ]);
+        (accumulatedText) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantMsgId ? { ...m, content: accumulatedText } : m))
+          );
+        }
+      );
+
+      deductUsage('Completed AI Response', 1.8);
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantMsgId
+            ? { ...m, content: '**Error**: Inference connection interrupted. Please try again.' }
+            : m
+        )
+      );
     } finally {
       setIsStreaming(false);
     }
-  }, [input, selectedModelId, deductUsage]);
+  }, [input, selectedModelId, messages, apiKeys, deductUsage]);
 
   const saveToPermanentChats = useCallback(() => {
     if (messages.length === 0) return;

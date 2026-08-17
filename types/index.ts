@@ -1,4 +1,4 @@
-export type AppView = 'chat' | 'billing' | 'collabs' | 'team-chats';
+export type AppView = 'chat' | 'billing' | 'collabs' | 'team-chats' | 'arena';
 
 export type ProviderName = 'Anthropic' | 'OpenAI' | 'Google';
 
@@ -20,12 +20,20 @@ export interface AIModel {
   desc: string;
 }
 
+export interface FileAttachment {
+  name: string;
+  size?: string;
+  type?: string;
+  content?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   model?: string;
   files?: string[];
+  attachments?: FileAttachment[];
   createdAt?: string;
 }
 
@@ -53,6 +61,7 @@ export interface WorkspaceDoc {
   name: string;
   info: string;
   uploadedBy: string;
+  content?: string;
 }
 
 export interface Workspace {
@@ -88,6 +97,24 @@ export interface RechargeRecord {
 
 export type HistoryType = 'usage' | 'recharge';
 
+export interface UserApiKeys {
+  openai?: string;
+  anthropic?: string;
+  google?: string;
+}
+
+export interface ArenaEntry {
+  id: string;
+  modelId: string;
+  status: 'idle' | 'streaming' | 'completed' | 'error';
+  content: string;
+  ttftMs?: number;
+  totalTimeMs?: number;
+  tokenCount?: number;
+  cost?: number;
+  error?: string;
+}
+
 /* ─── API Types ─── */
 
 export interface ChatRequest {
@@ -95,6 +122,9 @@ export interface ChatRequest {
   model: string;
   chatId?: string;
   files?: string[];
+  attachments?: FileAttachment[];
+  apiKeys?: UserApiKeys;
+  history?: { role: 'user' | 'assistant' | 'system'; content: string }[];
 }
 
 export interface ChatResponse {
@@ -102,6 +132,8 @@ export interface ChatResponse {
   role: 'assistant';
   model: string;
   content: string;
+  tokensUsed?: number;
+  creditsCost?: number;
 }
 
 export interface ApiError {

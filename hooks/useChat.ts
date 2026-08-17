@@ -5,13 +5,22 @@ import { ChatMessage } from '../types';
 import { useChatStore } from '../store/useChatStore';
 import { useUIStore } from '../store/useUIStore';
 import { useUserStore } from '../store/useUserStore';
-import { sendMessage } from '../services/api';
+import { streamChatMessage } from '../services/api';
 import { MOCK_MODELS } from '../data/mock';
 
 export function useChatCore() {
-  const { currentChatId, chats, pendingFiles, addChat, addMessageToChat, clearPendingFiles } = useChatStore();
+  const {
+    currentChatId,
+    chats,
+    pendingFiles,
+    pendingAttachments,
+    addChat,
+    addMessageToChat,
+    updateMessageContent,
+    clearPendingFiles,
+  } = useChatStore();
   const { selectedModelId } = useUIStore();
-  const { deductUsage } = useUserStore();
+  const { deductUsage, apiKeys } = useUserStore();
 
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -29,6 +38,7 @@ export function useChatCore() {
       role: 'user',
       content: trimmed,
       files: pendingFiles.length > 0 ? [...pendingFiles] : undefined,
+      attachments: pendingAttachments.length > 0 ? [...pendingAttachments] : undefined,
       createdAt: new Date().toISOString(),
     };
 
@@ -55,35 +65,61 @@ export function useChatCore() {
 
     deductUsage(trimmed, 1.2);
 
+    const assistantMsgId = `a_${Date.now()}`;
+    const initialAssistantMsg: ChatMessage = {
+      id: assistantMsgId,
+      role: 'assistant',
+      model: selectedModelId,
+      content: '',
+      createdAt: new Date().toISOString(),
+    };
+
+    addMessageToChat(targetChatId, initialAssistantMsg);
+
     try {
-      const res = await sendMessage({
-        prompt: trimmed,
-        model: selectedModelId,
-        chatId: targetChatId,
-      });
+      const historyContext = (currentChat?.messages || []).slice(-6).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
 
-      const assistantMsg: ChatMessage = {
-        id: res.id,
-        role: 'assistant',
-        model: selectedModelId,
-        content: res.content,
-        createdAt: new Date().toISOString(),
-      };
+      await streamChatMessage(
+        {
+          prompt: trimmed,
+          model: selectedModelId,
+          chatId: targetChatId,
+          attachments: pendingAttachments,
+          apiKeys,
+          history: historyContext,
+        },
+        (accumulatedText) => {
+          updateMessageContent(targetChatId!, assistantMsgId, accumulatedText);
+        }
+      );
 
-      addMessageToChat(targetChatId, assistantMsg);
-      deductUsage(res.content, 1.8);
+      deductUsage('Completed AI Response', 1.8);
     } catch {
-      addMessageToChat(targetChatId, {
-        id: `err_${Date.now()}`,
-        role: 'assistant',
-        model: selectedModelId,
-        content: '<p class=\"text-red-400\">Network error — please try again.</p>',
-        createdAt: new Date().toISOString(),
-      });
+      updateMessageContent(
+        targetChatId,
+        assistantMsgId,
+        '**Error**: Unable to reach AI inference service. Please check your network or API keys.'
+      );
     } finally {
       setIsStreaming(false);
     }
-  }, [input, currentChatId, selectedModelId, pendingFiles, addChat, addMessageToChat, clearPendingFiles, deductUsage]);
+  }, [
+    input,
+    currentChatId,
+    selectedModelId,
+    pendingFiles,
+    pendingAttachments,
+    currentChat,
+    apiKeys,
+    addChat,
+    addMessageToChat,
+    updateMessageContent,
+    clearPendingFiles,
+    deductUsage,
+  ]);
 
   return {
     input,
