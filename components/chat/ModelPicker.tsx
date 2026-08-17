@@ -1,129 +1,74 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore, MODELS } from '../../store/useAppStore';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { useUIStore } from '../../store/useUIStore';
 import { ProviderName } from '../../types';
+import { CheckIcon } from '../icons';
+import { MOCK_MODELS } from '../../data/mock';
 
 interface ModelPickerProps {
-  position?: 'top' | 'bottom';
+  onClose: () => void;
 }
 
-export function ModelPicker({ position = 'top' }: ModelPickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectedModelId = useAppStore((state) => state.selectedModelId);
-  const setSelectedModelId = useAppStore((state) => state.setSelectedModelId);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const currentModel = MODELS.find((m) => m.id === selectedModelId) || MODELS[0];
+export function ModelPicker({ onClose }: ModelPickerProps) {
+  const { selectedModelId, setSelectedModelId } = useUIStore();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+    function handler(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<ProviderName, typeof MOCK_MODELS>();
+    MOCK_MODELS.forEach((m) => {
+      if (!map.has(m.provider)) map.set(m.provider, []);
+      map.get(m.provider)!.push(m);
+    });
+    return map;
   }, []);
 
-  const providers: ProviderName[] = ['Anthropic', 'OpenAI', 'Google'];
-
   return (
-    <div className="relative inline-block" ref={menuRef}>
-      {position === 'top' ? (
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          className="flex items-center gap-2 border border-hub-border bg-hub-panel hover:bg-hub-hover text-hub-text rounded-[9px] px-3 py-[7px] font-semibold text-[13px] transition-colors"
-        >
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: currentModel.color }}
-          />
-          <span>{currentModel.name}</span>
-          <span className="text-hub-text-muted leading-none">
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="m2 3.5 3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          className="flex items-center gap-[8px] border border-hub-border bg-hub-panel hover:bg-hub-hover text-hub-text-sec rounded-[20px] px-2.5 py-[5px] font-medium text-[12px] transition-colors"
-        >
-          <span
-            className="w-[8px] h-[8px] rounded-full shrink-0"
-            style={{ backgroundColor: currentModel.color }}
-          />
-          <span>{currentModel.name}</span>
-          <span className="text-hub-text-muted leading-none">
-            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-              <path d="m2 3.5 3 3 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </button>
-      )}
+    <div
+      ref={panelRef}
+      className="absolute bottom-full right-0 mb-2 w-64 rounded-hub-md bg-hub-side border border-hub-border shadow-hub-float animate-scale-in origin-bottom-right z-50 overflow-hidden"
+    >
+      <div className="px-3 pt-3 pb-1.5 text-hub-xs font-semibold text-hub-text-muted uppercase tracking-wide">
+        Select model
+      </div>
 
-      {isOpen && (
-        <div
-          role="listbox"
-          className={`absolute z-50 w-[300px] bg-hub-panel border border-hub-border rounded-[12px] shadow-[0_14px_40px_rgba(0,0,0,0.5)] p-[6px] transition-all ${
-            position === 'top' ? 'top-[calc(100%+6px)] right-0' : 'bottom-[calc(100%+6px)] left-0'
-          }`}
-        >
-          {providers.map((provider) => {
-            const providerModels = MODELS.filter((m) => m.provider === provider);
-            if (providerModels.length === 0) return null;
+      {[...grouped.entries()].map(([provider, models]) => (
+        <div key={provider}>
+          <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-hub-text-muted/70 uppercase tracking-wider">
+            {provider}
+          </div>
+          {models.map((m) => {
+            const active = m.id === selectedModelId;
             return (
-              <div key={provider} className="mb-1 last:mb-0">
-                <div className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-hub-text-muted px-[10px] pt-2 pb-[4px]">
-                  {provider}
+              <button
+                key={m.id}
+                onClick={() => {
+                  setSelectedModelId(m.id);
+                  onClose();
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                  active ? 'bg-hub-active text-hub-text' : 'text-hub-text-sec hover:bg-hub-hover hover:text-hub-text'
+                }`}
+              >
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: m.color }} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-hub-sm font-medium truncate">{m.name}</div>
+                  <div className="text-[11px] text-hub-text-muted truncate">{m.desc}</div>
                 </div>
-                {providerModels.map((m) => {
-                  const isSelected = m.id === selectedModelId;
-                  return (
-                    <button
-                      key={m.id}
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      onClick={() => {
-                        setSelectedModelId(m.id);
-                        setIsOpen(false);
-                      }}
-                      className={`flex items-center gap-[10px] w-full text-left px-[10px] py-2 rounded-[8px] transition-colors ${
-                        isSelected ? 'bg-hub-hover text-hub-text' : 'hover:bg-hub-hover text-hub-text-sec'
-                      }`}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: m.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-[13px] text-hub-text">{m.name}</div>
-                        <div className="text-[11.5px] text-hub-text-muted truncate">{m.desc}</div>
-                      </div>
-                      {isSelected && (
-                        <span className="text-hub-accent-hi shrink-0">
-                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                            <path d="m2.5 7 3 3 5-6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+                {active && <span className="text-hub-accent shrink-0"><CheckIcon size={14} /></span>}
+              </button>
             );
           })}
         </div>
-      )}
+      ))}
     </div>
   );
 }

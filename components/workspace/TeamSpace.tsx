@@ -1,16 +1,21 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAppStore, MODELS } from '../../store/useAppStore';
+import { useUIStore } from '../../store/useUIStore';
+import { useWorkspaceStore } from '../../store/useWorkspaceStore';
+import { SafeHTML } from '../ui/SafeHTML';
+import { Workspace, WorkspaceDoc, WorkspaceMember, ChatMessage } from '../../types';
+import { MOCK_MODELS } from '../../data/mock';
 
 export function TeamSpace() {
-  const activeView = useAppStore((state) => state.activeView);
-  const setActiveView = useAppStore((state) => state.setActiveView);
-  const workspaces = useAppStore((state) => state.workspaces);
-  const currentWorkspaceId = useAppStore((state) => state.currentWorkspaceId);
-  const setCurrentWorkspaceId = useAppStore((state) => state.setCurrentWorkspaceId);
-  const addTeamDocument = useAppStore((state) => state.addTeamDocument);
-  const selectedModelId = useAppStore((state) => state.selectedModelId);
+  const activeView = useUIStore((state) => state.activeView);
+  const setActiveView = useUIStore((state) => state.setActiveView);
+  const selectedModelId = useUIStore((state) => state.selectedModelId);
+
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const currentWorkspaceId = useWorkspaceStore((state) => state.currentWorkspaceId);
+  const setCurrentWorkspaceId = useWorkspaceStore((state) => state.setCurrentWorkspaceId);
+  const addTeamDocument = useWorkspaceStore((state) => state.addTeamDocument);
 
   const [activeTeamChatIndex, setActiveTeamChatIndex] = useState<number | null>(0);
   const [selectedTeamDocs, setSelectedTeamDocs] = useState<string[]>([]);
@@ -21,9 +26,9 @@ export function TeamSpace() {
   const [inviteRole, setInviteRole] = useState('Editor');
   const [copiedLink, setCopiedLink] = useState(false);
 
-  const currentWorkspace = workspaces.find((w) => w.id === currentWorkspaceId) || workspaces[0];
+  const currentWorkspace = workspaces.find((w: Workspace) => w.id === currentWorkspaceId) || workspaces[0];
 
-  const filteredDocs = currentWorkspace.documents.filter((d) =>
+  const filteredDocs = currentWorkspace.documents.filter((d: WorkspaceDoc) =>
     d.name.toLowerCase().includes(docFilter.toLowerCase())
   );
 
@@ -54,9 +59,9 @@ export function TeamSpace() {
   const handleSendTeamMessage = () => {
     if (!teamInputText.trim() && selectedTeamDocs.length === 0) return;
 
-    const userMsg = {
+    const userMsg: ChatMessage = {
       id: `tm-${Date.now()}`,
-      role: 'user' as const,
+      role: 'user',
       content: teamInputText || 'Please review the selected team documents.',
       files: [...selectedTeamDocs],
     };
@@ -65,7 +70,7 @@ export function TeamSpace() {
       activeChat.messages.push(userMsg);
       activeChat.messages.push({
         id: `tm-reply-${Date.now()}`,
-        role: 'assistant' as const,
+        role: 'assistant',
         model: selectedModelId,
         content: '<p>I reviewed the shared workspace context and selected documents. Here is a coordinated response the team can continue working from.</p>',
       });
@@ -92,7 +97,7 @@ export function TeamSpace() {
                 Team Collabs
               </h1>
               <p className="text-hub-text-sec text-[12px] sm:text-[13px]">
-                See every workspace shared with you, team members involved, and each team’s usage.
+                See every workspace shared with you, team members involved, and each team structure.
               </p>
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
@@ -112,7 +117,7 @@ export function TeamSpace() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-            {workspaces.map((space) => (
+            {workspaces.map((space: Workspace) => (
               <button
                 key={space.id}
                 onClick={() => {
@@ -121,9 +126,6 @@ export function TeamSpace() {
                 }}
                 className="bg-hub-panel/90 backdrop-blur-md border border-hub-border hover:border-hub-accent/40 hover:bg-[#222526] rounded-xl p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/50 group relative overflow-hidden"
               >
-                {/* Subtle card ambient highlight */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-hub-accent/5 rounded-full blur-2xl group-hover:bg-hub-accent/10 transition-all pointer-events-none" />
-
                 <div className="flex justify-between gap-3 items-start mb-3">
                   <div>
                     <h2 className="font-bold text-[16px] text-hub-text group-hover:text-white mb-0.5 transition-colors tracking-tight leading-tight">
@@ -166,9 +168,8 @@ export function TeamSpace() {
                 </div>
 
                 <div className="flex items-center justify-between gap-3 text-xs text-hub-text-muted pt-1 border-t border-hub-border/40">
-                  {/* Clean stacked member avatars */}
                   <div className="flex items-center pl-1">
-                    {space.members.slice(0, 5).map((m, idx) => (
+                    {space.members.slice(0, 5).map((m: WorkspaceMember, idx: number) => (
                       <span
                         key={idx}
                         title={`${m.name} (${m.role})`}
@@ -202,7 +203,7 @@ export function TeamSpace() {
               onChange={(e) => setCurrentWorkspaceId(e.target.value)}
               className="w-full bg-hub-panel border border-hub-border rounded-[9px] p-2 text-[12px] text-hub-text mb-3 outline-none focus:border-hub-accent transition-colors cursor-pointer"
             >
-              {workspaces.map((w) => (
+              {workspaces.map((w: Workspace) => (
                 <option key={w.id} value={w.id}>
                   {w.name}
                 </option>
@@ -221,8 +222,8 @@ export function TeamSpace() {
 
             <h2 className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-hub-text-muted mb-2">Team chats</h2>
             <div className="space-y-1">
-              {currentWorkspace.chats.map((c, i) => {
-                const model = MODELS.find((m) => m.id === c.model);
+              {currentWorkspace.chats.map((c: any, i: number) => {
+                const model = MOCK_MODELS.find((m) => m.id === c.model);
                 const isActive = i === activeTeamChatIndex;
                 return (
                   <button
@@ -273,8 +274,8 @@ export function TeamSpace() {
                 </div>
               ) : (
                 <div className="max-w-[760px] mx-auto space-y-5">
-                  {activeChat.messages.map((m) => (
-                    <div key={m.id} className="flex gap-3 animate-in fade-in duration-200">
+                  {activeChat.messages.map((m: ChatMessage) => (
+                    <div key={m.id} className="flex gap-3 animate-fade-in">
                       <div
                         className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 text-white shadow-sm ${
                           m.role === 'user' ? 'bg-[#3B4A6B]' : 'bg-hub-accent'
@@ -290,7 +291,7 @@ export function TeamSpace() {
                         </div>
                         {m.files && m.files.length > 0 && (
                           <div className="flex flex-wrap gap-2 mb-2">
-                            {m.files.map((file, idx) => (
+                            {m.files.map((file: string, idx: number) => (
                               <span
                                 key={idx}
                                 className="inline-flex items-center gap-1.5 bg-hub-hover border border-hub-border rounded-[9px] px-2.5 py-1 text-xs text-hub-text-sec"
@@ -300,10 +301,9 @@ export function TeamSpace() {
                             ))}
                           </div>
                         )}
-                        <div
-                          className="text-[14px] text-hub-text leading-[1.55] bg-hub-panel border border-hub-border rounded-[12px] p-3.5 shadow-sm"
-                          dangerouslySetInnerHTML={{ __html: m.content }}
-                        />
+                        <div className="bg-hub-panel border border-hub-border rounded-[12px] p-3.5 shadow-sm">
+                          <SafeHTML html={m.content} />
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -361,7 +361,7 @@ export function TeamSpace() {
             </div>
 
             <div className="space-y-2">
-              {filteredDocs.map((doc) => {
+              {filteredDocs.map((doc: WorkspaceDoc) => {
                 const isSelected = selectedTeamDocs.includes(doc.name);
                 return (
                   <button
@@ -394,7 +394,7 @@ export function TeamSpace() {
 
       {/* Invite Teammate Modal */}
       {inviteModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm grid place-items-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm grid place-items-center p-4 animate-fade-in">
           <div className="w-full max-w-md bg-hub-panel border border-hub-border rounded-2xl p-6 shadow-2xl relative overflow-hidden">
             <h2 className="text-[16px] font-bold text-hub-text mb-0.5">Invite teammate</h2>
             <p className="text-[11.5px] text-hub-text-sec mb-4">Give a teammate access to the selected project space.</p>

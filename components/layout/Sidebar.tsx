@@ -1,213 +1,225 @@
 'use client';
 
-import React from 'react';
-import { useAppStore, MODELS } from '../../store/useAppStore';
+import React, { useState, useMemo } from 'react';
+import { useUIStore } from '../../store/useUIStore';
+import { useChatStore } from '../../store/useChatStore';
+import { useUserStore } from '../../store/useUserStore';
+import { Avatar } from '../ui/avatar';
+import { AppView, Chat } from '../../types';
+import { PlusIcon, SearchIcon, PinFilledIcon, ChatBubbleIcon, BillingIcon, TeamIcon, LockIcon, TrashIcon, CommandIcon } from '../icons';
+import { MOCK_MODELS } from '../../data/mock';
+
+const NAV_ITEMS: { key: AppView; label: string; icon: any }[] = [
+  { key: 'chat',    label: 'Chats',            icon: ChatBubbleIcon },
+  { key: 'collabs', label: 'Workspaces',       icon: TeamIcon },
+  { key: 'billing', label: 'Usage & billing',  icon: BillingIcon },
+];
 
 export function Sidebar() {
-  const sidebarOpen = useAppStore((state) => state.sidebarOpen);
-  const toggleSidebar = useAppStore((state) => state.toggleSidebar);
-  const activeView = useAppStore((state) => state.activeView);
-  const setActiveView = useAppStore((state) => state.setActiveView);
-  const currentChatId = useAppStore((state) => state.currentChatId);
-  const setCurrentChatId = useAppStore((state) => state.setCurrentChatId);
-  const chats = useAppStore((state) => state.chats);
-  const togglePinChat = useAppStore((state) => state.togglePinChat);
-  const createNewChat = useAppStore((state) => state.createNewChat);
-  const user = useAppStore((state) => state.user);
+  const { sidebarOpen, activeView, setActiveView, isTempChatActive, setIsTempChatActive } = useUIStore();
+  const { chats, currentChatId, setCurrentChatId, togglePinChat, createNewChat, deleteChat } = useChatStore();
+  const { user } = useUserStore();
 
-  const pinnedChats = chats.filter((c) => c.pinned);
-  const recentChats = chats.filter((c) => !c.pinned);
+  const [search, setSearch] = useState('');
+  const [pinnedOpen, setPinnedOpen] = useState(true);
+  const [recentOpen, setRecentOpen] = useState(true);
+
+  const filtered = useMemo(
+    () => chats.filter((c) => c.title.toLowerCase().includes(search.toLowerCase())),
+    [chats, search]
+  );
+  const pinned  = filtered.filter((c) => c.pinned);
+  const recent  = filtered.filter((c) => !c.pinned);
 
   if (!sidebarOpen) return null;
 
   return (
-    <aside className="w-[264px] bg-hub-side border-r border-hub-border flex flex-col h-screen shrink-0 transition-all duration-300 z-30 select-none">
-      {/* ─── Sidebar Header ─── */}
-      <div className="px-3 pt-3.5 pb-2.5">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-hub-accent-hi to-hub-accent text-white grid place-items-center text-sm font-extrabold shrink-0 shadow-md shadow-hub-accent/25">
-              M
-            </span>
-            <div className="leading-none">
-              <div className="font-bold text-[15px] text-hub-text tracking-tight">
-                Data Coffee
-              </div>
-              <div className="text-[10.5px] text-hub-text-muted font-medium mt-[2px]">
-                Model Hub
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={toggleSidebar}
-            title="Hide sidebar"
-            aria-label="Hide sidebar"
-            className="p-1.5 rounded-lg text-hub-text-sec hover:bg-hub-hover hover:text-hub-text transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M6 2.5v11" stroke="currentColor" strokeWidth="1.4" />
-            </svg>
-          </button>
-        </div>
-
-        <button
-          onClick={createNewChat}
-          className="flex items-center justify-center gap-2 w-full border border-hub-border/80 hover:border-hub-accent/40 bg-hub-panel/60 hover:bg-hub-hover text-hub-text rounded-[10px] px-3 py-[9px] text-[13px] font-semibold transition-all duration-200 shadow-sm active:scale-[0.97] group"
-        >
-          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" className="text-hub-accent-hi group-hover:scale-110 transition-transform">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          New chat
-        </button>
+    <aside className="shrink-0 flex flex-col w-sidebar-w bg-hub-side border-r border-hub-border h-full select-none">
+      {/* Logo Header */}
+      <div className="flex items-center justify-between px-4 h-12 shrink-0 border-b border-hub-border">
+        <span className="text-hub-accent text-hub-lg font-bold tracking-tight">☕ Data Coffee</span>
+        <span className="text-[10px] text-hub-text-muted bg-hub-panel border border-hub-border px-1.5 py-0.5 rounded font-mono">
+          Ctrl+K
+        </span>
       </div>
 
-      {/* ─── Scrollable Navigation ─── */}
-      <nav className="flex-1 overflow-y-auto px-2 py-0.5 space-y-0.5 min-h-0">
-        {/* Workspace Section */}
-        <div className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-hub-text-muted px-2.5 pt-4 pb-1">
-          Workspace
-        </div>
-        <button
-          onClick={() => setActiveView('billing')}
-          className={`flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[9px] text-[13px] font-medium transition-all duration-150 ${
-            activeView === 'billing'
-              ? 'bg-hub-hover text-hub-text font-semibold'
-              : 'text-hub-text-sec hover:bg-hub-hover/70 hover:text-hub-text'
-          }`}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-hub-accent-hi shrink-0">
-            <path d="M2 11V7m3 4V3m3 8V5m3 6V1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span>Usage & billing</span>
-        </button>
-
-        {/* Shared Workspace Section */}
-        <div className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-hub-text-muted px-2.5 pt-4 pb-1">
-          Shared Workspace
-        </div>
-        <button
-          onClick={() => setActiveView('collabs')}
-          className={`flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[9px] text-[13px] font-medium transition-all duration-150 ${
-            activeView === 'collabs'
-              ? 'bg-hub-hover text-hub-text font-semibold'
-              : 'text-hub-text-sec hover:bg-hub-hover/70 hover:text-hub-text'
-          }`}
-        >
-          <span className="w-[18px] h-[18px] border border-hub-border/80 rounded-[5px] grid place-items-center text-[10px] text-hub-accent-hi shrink-0">
-            ⌘
-          </span>
-          <span>Team Collabs</span>
-        </button>
-        <button
-          onClick={() => setActiveView('team-chats')}
-          className={`flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[9px] text-[13px] font-medium transition-all duration-150 ${
-            activeView === 'team-chats'
-              ? 'bg-hub-hover text-hub-text font-semibold'
-              : 'text-hub-text-sec hover:bg-hub-hover/70 hover:text-hub-text'
-          }`}
-        >
-          <span className="w-[18px] h-[18px] border border-hub-border/80 rounded-[5px] grid place-items-center text-[10px] text-hub-accent-hi shrink-0">
-            ⌘
-          </span>
-          <span>Team Chats</span>
-        </button>
-
-        {/* Pinned Section */}
-        {pinnedChats.length > 0 && (
-          <>
-            <div className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-hub-text-muted px-2.5 pt-4 pb-1">
-              Pinned
-            </div>
-            {pinnedChats.map((c) => {
-              const model = MODELS.find((m) => m.id === c.model) || MODELS[0];
-              const isActive = activeView === 'chat' && c.id === currentChatId;
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setCurrentChatId(c.id)}
-                  className={`group flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[9px] cursor-pointer transition-all duration-150 ${
-                    isActive
-                      ? 'bg-hub-active text-hub-text font-semibold'
-                      : 'text-hub-text-sec hover:bg-hub-hover/70 hover:text-hub-text'
-                  }`}
-                >
-                  <span
-                    className="w-[7px] h-[7px] rounded-full shrink-0"
-                    style={{ backgroundColor: model.color }}
-                  />
-                  <span className="flex-1 min-w-0 truncate text-[13px]">{c.title}</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      togglePinChat(c.id);
-                    }}
-                    title="Unpin"
-                    className="text-amber-400 p-0.5 rounded hover:bg-hub-hover transition-opacity"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                      <path d="M7.5 1.5 10.5 4.5 8 5.5 6.5 9 5 7.5 2 10.5 4.5 7 3 5.5 6.5 4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })}
-          </>
-        )}
-
-        {/* Recents Section */}
-        <div className="text-[10.5px] font-semibold tracking-[0.08em] uppercase text-hub-text-muted px-2.5 pt-4 pb-1">
-          Recents
-        </div>
-        {recentChats.map((c) => {
-          const model = MODELS.find((m) => m.id === c.model) || MODELS[0];
-          const isActive = activeView === 'chat' && c.id === currentChatId;
+      {/* Navigation Links */}
+      <nav className="flex flex-col gap-0.5 px-2 pt-3 pb-1">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const active = (activeView === item.key || (item.key === 'collabs' && activeView === 'team-chats')) && !isTempChatActive;
           return (
-            <div
-              key={c.id}
-              onClick={() => setCurrentChatId(c.id)}
-              className={`group flex items-center gap-2.5 w-full text-left px-2.5 py-[7px] rounded-[9px] cursor-pointer transition-all duration-150 ${
-                isActive
-                  ? 'bg-hub-active text-hub-text font-semibold'
-                  : 'text-hub-text-sec hover:bg-hub-hover/70 hover:text-hub-text'
+            <button
+              key={item.key}
+              onClick={() => {
+                setIsTempChatActive(false);
+                setActiveView(item.key);
+              }}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-hub-sm text-hub-sm font-medium transition-colors ${
+                active ? 'bg-hub-active text-hub-text' : 'text-hub-text-sec hover:bg-hub-hover hover:text-hub-text'
               }`}
             >
-              <span
-                className="w-[7px] h-[7px] rounded-full shrink-0"
-                style={{ backgroundColor: model.color }}
-              />
-              <span className="flex-1 min-w-0 truncate text-[13px]">{c.title}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePinChat(c.id);
-                }}
-                title="Pin chat"
-                className="opacity-0 group-hover:opacity-100 text-hub-text-muted hover:text-amber-400 p-0.5 rounded hover:bg-hub-hover transition-all"
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M7.5 1.5 10.5 4.5 8 5.5 6.5 9 5 7.5 2 10.5 4.5 7 3 5.5 6.5 4z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
+              <Icon size={15} />
+              {item.label}
+            </button>
           );
         })}
       </nav>
 
-      {/* ─── Sidebar Footer ─── */}
-      <div className="border-t border-hub-border px-3 py-3 flex items-center gap-2.5 bg-hub-side shrink-0">
-        <div className="w-[30px] h-[30px] rounded-full bg-gradient-to-br from-[#3B4A6B] to-[#25324E] text-white flex items-center justify-center font-bold text-[11px] shrink-0 border border-white/10">
-          {user.avatar}
+      {/* Chats Section */}
+      {(activeView === 'chat' || activeView === 'team-chats') && (
+        <div className="flex-1 flex flex-col min-h-0 border-t border-hub-border mt-1">
+          {/* Action buttons */}
+          <div className="px-2 pt-2 pb-1 flex flex-col gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                onClick={() => {
+                  setIsTempChatActive(false);
+                  createNewChat();
+                }}
+                className="flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-hub-sm text-hub-xs font-semibold text-hub-accent hover:bg-hub-hover transition-colors border border-hub-accent/20"
+              >
+                <PlusIcon size={13} />
+                New Chat
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsTempChatActive(true);
+                  setActiveView('chat');
+                }}
+                className={`flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-hub-sm text-hub-xs font-semibold transition-colors border ${
+                  isTempChatActive
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'text-amber-400 hover:bg-hub-hover border-amber-500/20'
+                }`}
+                title="Start an ephemeral, un-saved conversation"
+              >
+                <LockIcon size={13} />
+                Temp Chat
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-hub-text-muted">
+                <SearchIcon size={13} />
+              </span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search chats…"
+                className="w-full h-7.5 pl-8 pr-3 rounded-hub-sm bg-hub-bg border border-hub-border text-hub-xs text-hub-text placeholder:text-hub-text-muted outline-none focus:border-hub-accent/60 transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Chat List */}
+          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-0.5">
+            {pinned.length > 0 && (
+              <ChatGroup label="Pinned" open={pinnedOpen} onToggle={() => setPinnedOpen(!pinnedOpen)}>
+                {pinned.map((c) => (
+                  <ChatRow
+                    key={c.id}
+                    chat={c}
+                    active={!isTempChatActive && c.id === currentChatId}
+                    onSelect={() => {
+                      setIsTempChatActive(false);
+                      setCurrentChatId(c.id);
+                    }}
+                    onTogglePin={() => togglePinChat(c.id)}
+                    onDelete={() => deleteChat(c.id)}
+                  />
+                ))}
+              </ChatGroup>
+            )}
+            {recent.length > 0 && (
+              <ChatGroup label="Recent" open={recentOpen} onToggle={() => setRecentOpen(!recentOpen)}>
+                {recent.map((c) => (
+                  <ChatRow
+                    key={c.id}
+                    chat={c}
+                    active={!isTempChatActive && c.id === currentChatId}
+                    onSelect={() => {
+                      setIsTempChatActive(false);
+                      setCurrentChatId(c.id);
+                    }}
+                    onTogglePin={() => togglePinChat(c.id)}
+                    onDelete={() => deleteChat(c.id)}
+                  />
+                ))}
+              </ChatGroup>
+            )}
+          </div>
         </div>
+      )}
+
+      {/* User Footer */}
+      <div className="shrink-0 flex items-center gap-2.5 px-3 py-3 border-t border-hub-border">
+        <Avatar initials={user.avatar} size="sm" />
         <div className="flex-1 min-w-0">
-          <div className="font-semibold text-[12.5px] text-hub-text leading-tight truncate">{user.name}</div>
-          <div className="text-[10.5px] text-hub-text-muted leading-tight">{user.plan}</div>
+          <div className="text-hub-sm font-medium truncate">{user.name}</div>
+          <div className="text-hub-xs text-hub-text-muted truncate">{user.plan}</div>
         </div>
-        <div className="text-right shrink-0">
-          <div className="text-[11px] font-bold text-hub-accent-hi leading-tight">{user.creditsRemaining.toFixed(2)} credits</div>
-          <div className="text-[10px] text-hub-text-muted leading-tight">{new Intl.NumberFormat('en-US').format(user.tokensUsed)} tokens</div>
-        </div>
+        <span className="text-hub-xs text-hub-accent font-semibold">${user.creditsRemaining.toFixed(2)}</span>
       </div>
     </aside>
+  );
+}
+
+function ChatGroup({ label, open, onToggle, children }: { label: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1.5 px-2 py-1.5 w-full text-hub-xs font-semibold text-hub-text-muted uppercase tracking-wide hover:text-hub-text-sec transition-colors"
+      >
+        <span>{open ? '▼' : '▶'}</span>
+        {label}
+      </button>
+      {open && <div className="space-y-0.5">{children}</div>}
+    </div>
+  );
+}
+
+function ChatRow({
+  chat,
+  active,
+  onSelect,
+  onTogglePin,
+  onDelete,
+}: {
+  chat: Chat;
+  active: boolean;
+  onSelect: () => void;
+  onTogglePin: () => void;
+  onDelete: () => void;
+}) {
+  const model = MOCK_MODELS.find((m) => m.id === chat.model);
+  return (
+    <div
+      onClick={onSelect}
+      onDoubleClick={onTogglePin}
+      className={`group w-full flex items-center gap-2 px-3 py-2 rounded-hub-sm text-left transition-colors cursor-pointer ${
+        active ? 'bg-hub-active text-hub-text' : 'text-hub-text-sec hover:bg-hub-hover hover:text-hub-text'
+      }`}
+      title="Double-click to pin/unpin"
+    >
+      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: model?.color || '#888' }} />
+      <span className="flex-1 truncate text-hub-sm">{chat.title}</span>
+
+      {chat.pinned && <span className="text-hub-text-muted opacity-60 shrink-0"><PinFilledIcon size={11} /></span>}
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="opacity-0 group-hover:opacity-100 p-0.5 text-hub-text-muted hover:text-red-400 transition-opacity"
+        title="Delete chat"
+      >
+        <TrashIcon size={12} />
+      </button>
+    </div>
   );
 }

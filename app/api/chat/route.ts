@@ -1,42 +1,39 @@
-import { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
+const CANNED_RESPONSES: Record<string, string> = {
+  code: '<p>Here\'s an implementation plan:</p><ol><li>Set up project architecture.</li><li>Create TypeScript interfaces for domain entities.</li><li>Build component layer with Tailwind.</li><li>Wire up Zustand state management.</li></ol>',
+  comparison: '<p>Comparing options side by side: key differences are in <b>latency</b>, <b>throughput</b>, and <b>pricing</b>.</p>',
+  fallback: '<p>Great question! Let me break this down step-by-step for you. Based on the context provided, starting simple and iterating is the best approach.</p>',
+};
 
-const REPLIES = [
-  "Good question — here’s a quick take. The main thing to get right is the goal: once that’s clear, the structure follows naturally. Want me to expand any part of this?",
-  "Here’s a concise answer:\n\nStart simple, verify it works, then layer on complexity. Most problems in this area come from doing those steps in the opposite order.",
-  "I’ve looked at what you sent. The short version: the approach is sound, but watch the edge cases — empty inputs and very large values are where it will break first.",
-  "Sure — I’d suggest three options, from simplest to most robust, and I’d start with the simplest unless you already know you’ll outgrow it."
-];
+function pickResponse(prompt: string): string {
+  const lower = (prompt || '').toLowerCase();
+  if (lower.includes('code') || lower.includes('build') || lower.includes('implement'))
+    return CANNED_RESPONSES.code;
+  if (lower.includes('compare') || lower.includes('difference') || lower.includes('vs'))
+    return CANNED_RESPONSES.comparison;
+  return CANNED_RESPONSES.fallback;
+}
 
-export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { messages, model } = body;
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { prompt, model } = body;
 
-  const lastUserMessage = messages?.[messages.length - 1]?.content || 'Hello';
-  const selectedReply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
-  const fullText = `[Responding via ${model || 'Claude Sonnet'}]: ${selectedReply}`;
+    if (!model) {
+      return NextResponse.json({ error: 'Missing required field: model' }, { status: 400 });
+    }
 
-  const encoder = new TextEncoder();
+    // Simulate API latency
+    await new Promise((res) => setTimeout(res, 500 + Math.random() * 300));
 
-  // Create a Server-Sent Events (SSE) stream compatible with Vercel AI SDK useChat
-  const stream = new ReadableStream({
-    async start(controller) {
-      const words = fullText.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        const chunk = (i === 0 ? '' : ' ') + words[i];
-        // Format as Vercel AI SDK data protocol or plain text stream
-        controller.enqueue(encoder.encode(`0:${JSON.stringify(chunk)}\n`));
-        await new Promise((res) => setTimeout(res, 50));
-      }
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'X-Vercel-AI-Data-Stream': 'v1',
-    },
-  });
+    return NextResponse.json({
+      id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      role: 'assistant',
+      model,
+      content: pickResponse(prompt || ''),
+    });
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+  }
 }

@@ -1,23 +1,30 @@
 'use client';
 
 import React from 'react';
-import { useAppStore } from '../store/useAppStore';
+import { useUIStore } from '../store/useUIStore';
 import { Sidebar } from '../components/layout/Sidebar';
 import { ChatArea } from '../components/chat/ChatArea';
 import { UsageDashboard } from '../components/dashboard/UsageDashboard';
 import { TeamSpace } from '../components/workspace/TeamSpace';
+import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { CommandPalette } from '../components/ui/CommandPalette';
 
 export default function Home() {
-  const activeView = useAppStore((state) => state.activeView);
+  const activeView = useUIStore((state) => state.activeView);
 
   return (
     <div className="flex h-screen overflow-hidden bg-hub-bg font-sans">
-      <Sidebar />
+      <ErrorBoundary>
+        <Sidebar />
+      </ErrorBoundary>
       <main className="flex-1 flex flex-col min-w-0 min-h-0 relative">
-        {activeView === 'chat' && <ChatArea />}
-        {activeView === 'billing' && <UsageDashboard />}
-        {(activeView === 'collabs' || activeView === 'team-chats') && <TeamSpace />}
+        <ErrorBoundary>
+          {activeView === 'chat' && <ChatArea />}
+          {activeView === 'billing' && <UsageDashboard />}
+          {(activeView === 'collabs' || activeView === 'team-chats') && <TeamSpace />}
+        </ErrorBoundary>
       </main>
+      <CommandPalette />
     </div>
   );
 }

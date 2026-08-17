@@ -30,13 +30,16 @@ export interface ChatMessage {
 }
 
 export interface Chat {
-  id: number | string;
+  id: string;
   title: string;
   model: string;
   pinned: boolean;
   messages: ChatMessage[];
-  createdAt?: string;
+  createdAt: string;
+  updatedAt?: string;
+  deletedAt?: string;
   workspaceId?: string;
+  isTemporary?: boolean;
 }
 
 export interface WorkspaceMember {
@@ -84,3 +87,25 @@ export interface RechargeRecord {
 }
 
 export type HistoryType = 'usage' | 'recharge';
+
+/* ─── API Types ─── */
+
+export interface ChatRequest {
+  prompt: string;
+  model: string;
+  chatId?: string;
+  files?: string[];
+}
+
+export interface ChatResponse {
+  id: string;
+  role: 'assistant';
+  model: string;
+  content: string;
+}
+
+export interface ApiError {
+  code: string;
+  message: string;
+  status: number;
+}

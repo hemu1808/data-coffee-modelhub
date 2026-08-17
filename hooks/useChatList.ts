@@ -1,31 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Chat } from '../types';
-import { useAppStore } from '../store/useAppStore';
+import { fetchChats, createChat } from '../services/api';
+import { useChatStore } from '../store/useChatStore';
 
 export function useChatList() {
-  const storeChats = useAppStore((state) => state.chats);
+  const storeChats = useChatStore((state) => state.chats);
 
   return useQuery<Chat[]>({
     queryKey: ['chats'],
-    queryFn: async () => {
-      await new Promise((res) => setTimeout(res, 100));
-      return storeChats;
-    },
+    queryFn: fetchChats,
     initialData: storeChats,
   });
 }
 
 export function useCreateChatMutation() {
   const queryClient = useQueryClient();
-  const addChat = useAppStore((state) => state.addChat);
+  const addChat = useChatStore((state) => state.addChat);
 
   return useMutation({
-    mutationFn: async (newChat: Chat) => {
-      await new Promise((res) => setTimeout(res, 150));
+    mutationFn: (newChat: Chat) => createChat(newChat),
+    onSuccess: (newChat) => {
       addChat(newChat);
-      return newChat;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['chats'] });
     },
   });
