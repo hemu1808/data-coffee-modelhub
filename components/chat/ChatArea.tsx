@@ -75,9 +75,13 @@ export function ChatArea() {
           {/* Messages Container */}
           <div className="flex-1 overflow-y-auto px-4 md:px-16 lg:px-28 py-6 space-y-5 scroll-smooth">
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                onEditRetry={!isTempChatActive ? coreChat.handleEditRetry : undefined}
+                onRegenerate={!isTempChatActive ? coreChat.handleRegenerate : undefined}
+              />
             ))}
-
 
             <div ref={bottomRef} />
           </div>

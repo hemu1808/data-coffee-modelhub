@@ -2,11 +2,13 @@ export type AppView = 'chat' | 'billing' | 'collabs' | 'team-chats' | 'arena';
 
 export type ProviderName = 'Anthropic' | 'OpenAI' | 'Google';
 
+export type BillingPlanTier = 'Free' | 'Pro' | 'Team' | 'Enterprise';
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  plan: string;
+  plan: BillingPlanTier | string;
   avatar: string;
   creditsRemaining: number;
   tokensUsed: number;
@@ -25,6 +27,26 @@ export interface FileAttachment {
   size?: string;
   type?: string;
   content?: string;
+  url?: string;
+}
+
+export interface SemanticCitation {
+  id: string;
+  documentName: string;
+  startLine?: number;
+  endLine?: number;
+  snippet: string;
+  score?: number;
+}
+
+export interface MessageVersion {
+  id: string;
+  content: string;
+  model?: string;
+  createdAt: string;
+  files?: string[];
+  attachments?: FileAttachment[];
+  citations?: SemanticCitation[];
 }
 
 export interface ChatMessage {
@@ -35,6 +57,15 @@ export interface ChatMessage {
   files?: string[];
   attachments?: FileAttachment[];
   createdAt?: string;
+  
+  // Message Branching & Versioning
+  versions?: MessageVersion[];
+  versionIndex?: number;
+  citations?: SemanticCitation[];
+  forkedFrom?: {
+    chatId: string;
+    messageId: string;
+  };
 }
 
 export interface Chat {
@@ -48,6 +79,7 @@ export interface Chat {
   deletedAt?: string;
   workspaceId?: string;
   isTemporary?: boolean;
+  forkedFromChatId?: string;
 }
 
 export interface WorkspaceMember {
@@ -55,6 +87,7 @@ export interface WorkspaceMember {
   name: string;
   role: 'Owner' | 'Admin' | 'Editor' | 'Viewer';
   color: string;
+  email?: string;
 }
 
 export interface WorkspaceDoc {
@@ -62,6 +95,8 @@ export interface WorkspaceDoc {
   info: string;
   uploadedBy: string;
   content?: string;
+  embeddingStatus?: 'indexed' | 'indexing' | 'unindexed' | 'failed';
+  chunkCount?: number;
 }
 
 export interface Workspace {
@@ -93,6 +128,17 @@ export interface RechargeRecord {
   credits: number;
   amount: string;
   status: 'Successful' | 'Pending' | 'Failed';
+  provider?: 'Stripe' | 'Lemon Squeezy' | 'Direct' | 'Manual';
+}
+
+export interface WebhookEventLog {
+  id: string;
+  timestamp: string;
+  provider: 'stripe' | 'lemonsqueezy';
+  event: string;
+  status: 'processed' | 'failed' | 'simulated';
+  payloadSummary: string;
+  creditsAdded?: number;
 }
 
 export type HistoryType = 'usage' | 'recharge';
@@ -115,6 +161,24 @@ export interface ArenaEntry {
   error?: string;
 }
 
+/* ─── Vector DB / RAG Types ─── */
+
+export interface DocumentChunk {
+  id: string;
+  documentName: string;
+  chunkIndex: number;
+  startLine: number;
+  endLine: number;
+  content: string;
+  tokenCount: number;
+  embedding?: number[];
+}
+
+export interface VectorSearchResult {
+  chunk: DocumentChunk;
+  similarity: number;
+}
+
 /* ─── API Types ─── */
 
 export interface ChatRequest {
@@ -125,6 +189,8 @@ export interface ChatRequest {
   attachments?: FileAttachment[];
   apiKeys?: UserApiKeys;
   history?: { role: 'user' | 'assistant' | 'system'; content: string }[];
+  useRag?: boolean;
+  workspaceId?: string;
 }
 
 export interface ChatResponse {
@@ -134,6 +200,15 @@ export interface ChatResponse {
   content: string;
   tokensUsed?: number;
   creditsCost?: number;
+  citations?: SemanticCitation[];
+}
+
+export interface CheckoutSessionRequest {
+  amount: number;
+  credits: number;
+  provider: 'stripe' | 'lemonsqueezy';
+  planType?: 'one-time' | 'pro' | 'team';
+  userEmail: string;
 }
 
 export interface ApiError {

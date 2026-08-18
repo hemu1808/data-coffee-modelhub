@@ -30,7 +30,7 @@ const NAV_ITEMS: { key: AppView; label: string; icon: any }[] = [
 export function Sidebar() {
   const { sidebarOpen, activeView, setActiveView, isTempChatActive, setIsTempChatActive } = useUIStore();
   const { chats, currentChatId, setCurrentChatId, togglePinChat, createNewChat, deleteChat } = useChatStore();
-  const { user, setKeyModalOpen, apiKeys } = useUserStore();
+  const { user, setKeyModalOpen, setAuthModalOpen, apiKeys } = useUserStore();
 
   const [search, setSearch] = useState('');
   const [pinnedOpen, setPinnedOpen] = useState(true);
@@ -185,17 +185,24 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* User Footer */}
-      <div className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 border-t border-hub-border bg-hub-side">
+      {/* User Footer / Auth Profile Trigger */}
+      <button
+        onClick={() => setAuthModalOpen(true)}
+        className="shrink-0 flex items-center gap-2.5 px-3 py-2.5 border-t border-hub-border bg-hub-side hover:bg-hub-hover text-left transition-colors group cursor-pointer"
+        title="Manage Account, NextAuth Session & Auto-Login"
+      >
         <div className="shrink-0">
           <Avatar initials={user.avatar} size="sm" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold text-hub-text truncate leading-snug">{user.name}</div>
-          <div className="text-[11px] text-hub-text-muted truncate leading-tight">{user.plan}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-hub-text truncate leading-snug group-hover:text-hub-accent-hi transition-colors">{user.name}</span>
+            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-hub-accent/15 text-hub-accent-hi border border-hub-accent/25">{user.plan}</span>
+          </div>
+          <div className="text-[11px] text-hub-text-muted truncate leading-tight">{user.email}</div>
         </div>
         <span className="text-xs text-hub-accent font-bold shrink-0 font-mono tracking-tight">${user.creditsRemaining.toFixed(2)}</span>
-      </div>
+      </button>
     </aside>
   );
 }

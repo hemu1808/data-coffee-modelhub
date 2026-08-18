@@ -10,6 +10,8 @@ import { TeamSpace } from '../components/workspace/TeamSpace';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { CommandPalette } from '../components/ui/CommandPalette';
 import { ApiKeyModal } from '../components/settings/ApiKeyModal';
+import { AuthModal } from '../components/auth/AuthModal';
+import { DocumentInspector } from '../components/document/DocumentInspector';
 
 export default function Home() {
   const activeView = useUIStore((state) => state.activeView);
@@ -29,6 +31,8 @@ export default function Home() {
       </main>
       <CommandPalette />
       <ApiKeyModal />
+      <AuthModal />
+      <DocumentInspector />
     </div>
   );
 }

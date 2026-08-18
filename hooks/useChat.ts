@@ -17,6 +17,8 @@ export function useChatCore() {
     addChat,
     addMessageToChat,
     updateMessageContent,
+    editUserMessageAndBranch,
+    createAssistantVersion,
     clearPendingFiles,
   } = useChatStore();
   const { selectedModelId } = useUIStore();
@@ -121,6 +123,124 @@ export function useChatCore() {
     deductUsage,
   ]);
 
+  const handleEditRetry = useCallback(
+    async (messageId: string, newPrompt: string) => {
+      if (!currentChatId || !newPrompt.trim()) return;
+
+      editUserMessageAndBranch(currentChatId, messageId, newPrompt);
+      setIsStreaming(true);
+      deductUsage(newPrompt, 1.2);
+
+      // Find the following assistant message or create a new one
+      const msgIndex = (currentChat?.messages || []).findIndex((m) => m.id === messageId);
+      const nextMsg = currentChat?.messages[msgIndex + 1];
+
+      let targetAssistantId = nextMsg?.id;
+      if (!targetAssistantId) {
+        targetAssistantId = `a_${Date.now()}`;
+        addMessageToChat(currentChatId, {
+          id: targetAssistantId,
+          role: 'assistant',
+          model: selectedModelId,
+          content: '',
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        createAssistantVersion(currentChatId, targetAssistantId, '');
+      }
+
+      try {
+        const historyContext = (currentChat?.messages || []).slice(0, msgIndex).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        await streamChatMessage(
+          {
+            prompt: newPrompt,
+            model: selectedModelId,
+            chatId: currentChatId,
+            attachments: currentChat?.messages[msgIndex]?.attachments,
+            apiKeys,
+            history: historyContext,
+          },
+          (accumulatedText) => {
+            updateMessageContent(currentChatId, targetAssistantId!, accumulatedText);
+          }
+        );
+
+        deductUsage('Completed Branch AI Response', 1.8);
+      } catch {
+        updateMessageContent(
+          currentChatId,
+          targetAssistantId!,
+          '**Error**: Unable to complete branching response.'
+        );
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [
+      currentChatId,
+      currentChat,
+      selectedModelId,
+      apiKeys,
+      editUserMessageAndBranch,
+      createAssistantVersion,
+      addMessageToChat,
+      updateMessageContent,
+      deductUsage,
+    ]
+  );
+
+  const handleRegenerate = useCallback(
+    async (assistantMsgId: string) => {
+      if (!currentChatId || !currentChat) return;
+
+      const targetMsgIndex = currentChat.messages.findIndex((m) => m.id === assistantMsgId);
+      if (targetMsgIndex === -1) return;
+
+      const prevUserMsg = currentChat.messages[targetMsgIndex - 1];
+      const promptToUse = prevUserMsg?.content || 'Please provide an alternative response.';
+
+      createAssistantVersion(currentChatId, assistantMsgId, '');
+      setIsStreaming(true);
+      deductUsage('Regeneration Request', 1.0);
+
+      try {
+        const historyContext = currentChat.messages.slice(0, targetMsgIndex - 1).map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        await streamChatMessage(
+          {
+            prompt: promptToUse,
+            model: selectedModelId,
+            chatId: currentChatId,
+            attachments: prevUserMsg?.attachments,
+            apiKeys,
+            history: historyContext,
+          },
+          (accumulatedText) => {
+            updateMessageContent(currentChatId, assistantMsgId, accumulatedText);
+          }
+        );
+
+        deductUsage('Completed Regenerated Response', 1.8);
+      } catch {
+        updateMessageContent(
+          currentChatId,
+          assistantMsgId,
+          '**Error**: Regeneration failed. Please try again.'
+        );
+      } finally {
+        setIsStreaming(false);
+      }
+    },
+    [currentChatId, currentChat, selectedModelId, apiKeys, createAssistantVersion, updateMessageContent, deductUsage]
+  );
+
   return {
     input,
     setInput,
@@ -129,5 +249,7 @@ export function useChatCore() {
     currentChat,
     messages,
     handleSend,
+    handleEditRetry,
+    handleRegenerate,
   };
 }

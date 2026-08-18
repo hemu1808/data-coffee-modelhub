@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User, UserApiKeys } from '../types';
+import { User, UserApiKeys, BillingPlanTier } from '../types';
 import { MOCK_USER } from '../data/mock';
 
 interface UserState {
@@ -8,12 +8,16 @@ interface UserState {
   requestCount: number;
   apiKeys: UserApiKeys;
   keyModalOpen: boolean;
+  authModalOpen: boolean;
 
   deductUsage: (text: string, multiplier?: number) => void;
   rechargeCredits: (amount: number) => void;
   setUser: (user: User) => void;
+  loginAsUser: (account: User) => void;
+  upgradePlan: (plan: BillingPlanTier) => void;
   setApiKeys: (keys: Partial<UserApiKeys>) => void;
   setKeyModalOpen: (open: boolean) => void;
+  setAuthModalOpen: (open: boolean) => void;
 }
 
 const CREDIT_COST_PER_1K_TOKENS = 0.75;
@@ -29,6 +33,7 @@ export const useUserStore = create<UserState>()(
         google: '',
       },
       keyModalOpen: false,
+      authModalOpen: false,
 
       deductUsage: (text, multiplier = 1) => {
         const rawLen = (text || '').replace(/<[^>]+>/g, '').length;
@@ -60,12 +65,26 @@ export const useUserStore = create<UserState>()(
 
       setUser: (user) => set({ user }),
 
+      loginAsUser: (account) =>
+        set({
+          user: account,
+        }),
+
+      upgradePlan: (plan) =>
+        set((state) => ({
+          user: {
+            ...state.user,
+            plan,
+          },
+        })),
+
       setApiKeys: (keys) =>
         set((state) => ({
           apiKeys: { ...state.apiKeys, ...keys },
         })),
 
       setKeyModalOpen: (open) => set({ keyModalOpen: open }),
+      setAuthModalOpen: (open) => set({ authModalOpen: open }),
     }),
     {
       name: 'modelhub-user-store',

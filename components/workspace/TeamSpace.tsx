@@ -10,6 +10,8 @@ import { MOCK_MODELS } from '../../data/mock';
 import { parseUploadedFile } from '../../lib/documentParser';
 import { streamChatMessage } from '../../services/api';
 import { useToast } from '../ui/Toast';
+import { useDocumentStore } from '../../store/useDocumentStore';
+import { EyeIcon } from '../icons';
 
 export function TeamSpace() {
   const activeView = useUIStore((state) => state.activeView);
@@ -414,27 +416,46 @@ export function TeamSpace() {
               {filteredDocs.map((doc: WorkspaceDoc) => {
                 const isSelected = selectedTeamDocs.includes(doc.name);
                 return (
-                  <button
+                  <div
                     key={doc.name}
-                    onClick={() => toggleDocSelection(doc.name)}
-                    className={`flex items-start gap-2.5 w-full text-left bg-hub-panel border rounded-[10px] p-2.5 transition-all duration-150 ${
+                    className={`flex items-center justify-between gap-2.5 w-full bg-hub-panel border rounded-[10px] p-2.5 transition-all duration-150 group ${
                       isSelected
                         ? 'border-hub-accent bg-hub-hover shadow-sm'
                         : 'border-hub-border hover:border-hub-text-muted'
                     }`}
                   >
-                    <span
-                      className={`w-4 h-4 border border-hub-border rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold transition-all ${
-                        isSelected ? 'bg-hub-accent text-white border-hub-accent shadow-sm' : 'text-transparent'
-                      }`}
+                    <button
+                      onClick={() => toggleDocSelection(doc.name)}
+                      className="flex items-start gap-2.5 min-w-0 flex-1 text-left"
                     >
-                      ✓
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <strong className="block text-xs font-semibold text-hub-text truncate">{doc.name}</strong>
-                      <span className="text-[10.5px] text-hub-text-muted">{doc.info} · Uploaded by {doc.uploadedBy}</span>
-                    </div>
-                  </button>
+                      <span
+                        className={`w-4 h-4 border border-hub-border rounded-[5px] flex items-center justify-center shrink-0 mt-0.5 text-[10px] font-bold transition-all ${
+                          isSelected ? 'bg-hub-accent text-white border-hub-accent shadow-sm' : 'text-transparent'
+                        }`}
+                      >
+                        ✓
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <strong className="block text-xs font-semibold text-hub-text truncate">{doc.name}</strong>
+                        <span className="text-[10.5px] text-hub-text-muted">{doc.info} · Uploaded by {doc.uploadedBy}</span>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        useDocumentStore.getState().openInspector({
+                          name: doc.name,
+                          size: doc.info,
+                          content: doc.content || `[Workspace File: ${doc.name}]\n\nLine 1: Team document initialized.\nLine 2: Indexed with vector embeddings (text-embedding-3-small).\nLine 3: Semantic retrieval active for workspace queries.`,
+                        });
+                      }}
+                      className="p-1.5 rounded-lg text-hub-text-muted hover:text-hub-text hover:bg-hub-hover transition-colors opacity-0 group-hover:opacity-100"
+                      title="Inspect in Document Viewer"
+                    >
+                      <EyeIcon size={13} />
+                    </button>
+                  </div>
                 );
               })}
             </div>

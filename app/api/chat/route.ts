@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { searchSemanticDocuments, buildRagPromptContext } from '../../../lib/vectorDb';
 
 interface RequestPayload {
   prompt: string;
@@ -14,10 +15,10 @@ const MODEL_MAPPINGS: Record<string, { provider: 'openai' | 'anthropic' | 'googl
   'claude-opus':      { provider: 'anthropic', targetModel: 'claude-3-opus-20240229' },
   'gpt-5':            { provider: 'openai',    targetModel: 'gpt-4o' },
   'gpt-5-mini':       { provider: 'openai',    targetModel: 'gpt-4o-mini' },
-  'gemini-2.5-flash': { provider: 'google',    targetModel: 'gemini-2.0-flash' },
-  'gemini-2.5-pro':   { provider: 'google',    targetModel: 'gemini-1.5-pro' },
-  'gemini-flash':     { provider: 'google',    targetModel: 'gemini-1.5-flash' },
-  'gemini-pro':       { provider: 'google',    targetModel: 'gemini-1.5-pro' },
+  'gemini-2.5-flash': { provider: 'google',    targetModel: 'gemini-2.5-flash' },
+  'gemini-2.5-pro':   { provider: 'google',    targetModel: 'gemini-2.5-flash' },
+  'gemini-flash':     { provider: 'google',    targetModel: 'gemini-2.5-flash' },
+  'gemini-pro':       { provider: 'google',    targetModel: 'gemini-2.5-flash' },
 };
 
 export async function POST(req: NextRequest) {
@@ -29,26 +30,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing model identifier' }, { status: 400 });
     }
 
-    const mapping = MODEL_MAPPINGS[modelId] || { provider: 'google', targetModel: 'gemini-1.5-flash' };
+    const mapping = MODEL_MAPPINGS[modelId] || { provider: 'google', targetModel: 'gemini-2.5-flash' };
 
     // Resolve API keys (prioritizing user-provided BYOK keys, then environment variables)
     const openaiKey = (apiKeys.openai || process.env.OPENAI_API_KEY || '').trim();
     const anthropicKey = (apiKeys.anthropic || process.env.ANTHROPIC_API_KEY || '').trim();
     const googleKey = (
       apiKeys.google ||
+      process.env.GOOGLE_AI_API_KEY ||
       process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
       process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY ||
       ''
     ).trim();
 
-    // Build context with attached documents
+    // Build vector RAG context with attached documents
     let combinedPrompt = prompt;
     if (attachments.length > 0) {
-      const docContext = attachments
-        .map((doc) => `--- FILE: ${doc.name} ---\n${doc.content || ''}\n--- END FILE ---`)
-        .join('\n\n');
-      combinedPrompt = `Use the following attached document context if relevant:\n\n${docContext}\n\nUser Request: ${prompt}`;
+      const ragResults = await searchSemanticDocuments(prompt, attachments, openaiKey, 4);
+      if (ragResults.length > 0) {
+        const { contextPrompt } = buildRagPromptContext(ragResults);
+        combinedPrompt = `${contextPrompt}\n\nUser Question: ${prompt}`;
+      } else {
+        const docContext = attachments
+          .map((doc) => `--- FILE: ${doc.name} ---\n${doc.content || ''}\n--- END FILE ---`)
+          .join('\n\n');
+        combinedPrompt = `Use the following attached document context if relevant:\n\n${docContext}\n\nUser Request: ${prompt}`;
+      }
     }
 
     /* ─── 1. Google Gemini Provider with Auto Model Discovery ─── */
@@ -89,17 +97,19 @@ async function streamGoogleGemini(apiKey: string, requestedModel: string, prompt
           .map((m: any) => m.name.replace(/^models\//, ''));
 
         if (available.length > 0) {
-          // If requested model exists directly, use it
-          if (available.includes(requestedModel)) {
+          if (available.includes(requestedModel) && !requestedModel.includes('1.5')) {
             activeModel = requestedModel;
+          } else if (available.includes('gemini-2.5-flash')) {
+            activeModel = 'gemini-2.5-flash';
+          } else if (available.includes('gemini-2.5-flash-lite')) {
+            activeModel = 'gemini-2.5-flash-lite';
           } else {
-            // Find closest match or best available (prefer 2.0-flash, 1.5-flash, 1.5-pro, etc.)
             const match =
-              available.find((m) => m.includes('flash')) ||
-              available.find((m) => m.includes('pro')) ||
+              available.find((m) => m === 'gemini-2.5-flash' || m === 'gemini-2.5-flash-lite') ||
+              available.find((m) => m.includes('flash') && !m.includes('tts') && !m.includes('preview')) ||
               available.find((m) => m.includes('gemini')) ||
               available[0];
-            activeModel = match;
+            activeModel = match || 'gemini-2.5-flash';
           }
         }
       }
@@ -117,12 +127,11 @@ async function streamGoogleGemini(apiKey: string, requestedModel: string, prompt
       );
     }
   } catch {
-    // If ListModels request had network issue, fall back to default
-    activeModel = requestedModel;
+    activeModel = 'gemini-2.5-flash';
   }
 
-  // Step 2: Stream content from the verified active model
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
+  // Step 2: Stream content from the verified active model (with automatic flash-lite fallback on 503)
+  let endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const contents = [
     ...history.map((h) => ({
@@ -136,11 +145,20 @@ async function streamGoogleGemini(apiKey: string, requestedModel: string, prompt
   ];
 
   try {
-    const res = await fetch(endpoint, {
+    let res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents }),
     });
+
+    if (res.status === 503 && activeModel !== 'gemini-2.5-flash-lite') {
+      endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:streamGenerateContent?alt=sse&key=${apiKey}`;
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents }),
+      });
+    }
 
     if (!res.ok) {
       const errorText = await res.text();
@@ -413,8 +431,9 @@ function generateSimulatedStream(prompt: string, modelId: string, attachments: a
   } else if (lower.includes('compare') || lower.includes('difference') || lower.includes('vs') || lower.includes('storage') || lower.includes('pricing')) {
     responseMarkdown = `### Comparative Evaluation\n\n| Attribute | **Claude 3.5 Sonnet** | **GPT-4o** | **Gemini 2.0 Flash** |\n| :--- | :--- | :--- | :--- |\n| **Primary Strength** | Complex Coding & Logic | Speed & Multimodal Tools | Real-time Multimodal & 2M Context |\n| **Context Limit** | 200k Tokens | 128k Tokens | 2,000k Tokens |\n| **Latency (TTFT)** | ~420ms | ~310ms | ~220ms |\n| **Cost per 1M Input** | $3.00 | $2.50 | $0.10 |\n| **Best For** | Software engineering & deep analysis | General workflows & vision | Massive document RAG & fast chat |\n\n> **Recommendation:** Use **Gemini 2.0 / 2.5 Flash** for instant responses, and **Claude 3.5 Sonnet** for deep code synthesis.`;
   } else if (attachments.length > 0) {
+    const primaryDoc = attachments[0]?.name || 'document.pdf';
     const docNames = attachments.map((d) => d.name).join(', ');
-    responseMarkdown = `### Document Context Analysis\n\nI have reviewed the attached document(s): **${docNames}**.\n\n#### Key Insights Extracted:\n- **Structure**: Contextualized for enterprise workspace guidelines.\n- **Synthesis**: The requirements align directly with our recommended technical stack.\n- **Action Items**:\n  1. Validate security and access controls.\n  2. Proceed with modular service integration.\n  3. Monitor token consumption in the Billing Dashboard.`;
+    responseMarkdown = `### Document Context & Semantic Analysis\n\nI have retrieved and analyzed the attached context from **${docNames}** using vector embeddings (\`text-embedding-3-small\`):\n\n#### Key Findings & Citations:\n- **Executive Synthesis**: Relevant specifications have been extracted from source sections [[cite:${primaryDoc}#L1-L25]].\n- **Technical Compliance**: Data structures and requirements align with enterprise workspace architecture [[cite:${primaryDoc}#L26-L55]].\n\n#### Verified Actions:\n1. Click on the citation badges above to inspect the cited line numbers in the **Interactive Document Inspector**.\n2. Proceed with workspace pipeline execution or team collaboration.`;
   } else {
     responseMarkdown = `### Analysis & Recommended Steps\n\nThank you for your prompt. Here is a clear breakdown:\n\n1. **Core Concept**: Modern multi-model orchestration enables teams to choose the most cost-effective and capable LLM for each specific task.\n2. **Performance Insight**: Balancing latency against reasoning depth delivers optimal user experience.\n3. **Next Steps**: You can also use **Model Arena** to compare this output side-by-side with other candidate models.`;
   }
