@@ -263,3 +263,57 @@ export function RefreshIcon({ size = 13, className }: IconProps) {
   );
 }
 
+export function TrophyIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m-6-15h12v4a6 6 0 01-12 0V6zM6 6H3a2 2 0 00-2 2v1a4 4 0 004 4h1m12-7h3a2 2 0 012 2v1a4 4 0 01-4 4h-1" />
+    </svg>
+  );
+}
+
+export function GitForkIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="6" r="3" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9v3a3 3 0 003 3h3m0 0a3 3 0 003-3V9m-6 6v3" />
+    </svg>
+  );
+}
+
+export function CalculatorIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h8M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" />
+    </svg>
+  );
+}
+
+export function GaugeIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l4-4m5.6 2.4A9 9 0 113.4 12.4a9 9 0 0118.2 0z" />
+    </svg>
+  );
+}
+
+export function FlameIcon({ size = 14, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+    </svg>
+  );
+}
+
+export function MedalIcon({ size = 15, className }: IconProps) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8" className={className}>
+      <circle cx="12" cy="14" r="6" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8.21 13.89L7 21l5-2.5 5 2.5-1.21-7.11M9 3.5L12 9l3-5.5" />
+    </svg>
+  );
+}
+
+

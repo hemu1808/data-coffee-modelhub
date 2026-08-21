@@ -4,9 +4,10 @@ import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { useUIStore } from '../../store/useUIStore';
 import { useChatStore } from '../../store/useChatStore';
 import { ModelPicker } from './ModelPicker';
-import { PaperclipIcon, SendIcon, XIcon, DocIcon } from '../icons';
+import { PaperclipIcon, SendIcon, XIcon, DocIcon, CalculatorIcon, GaugeIcon } from '../icons';
 import { MOCK_MODELS } from '../../data/mock';
 import { parseUploadedFile } from '../../lib/documentParser';
+import { estimatePromptCost } from '../../lib/pricing';
 
 interface ComposerProps {
   input: string;
@@ -24,6 +25,13 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentModel = MOCK_MODELS.find((m) => m.id === selectedModelId) || MOCK_MODELS[0];
+
+  // Live Token & Cost Estimation
+  const costEstimate = estimatePromptCost(
+    input,
+    pendingFiles.map((f) => ({ name: f })),
+    selectedModelId
+  );
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -51,7 +59,7 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
 
   return (
     <div
-      className={`relative rounded-hub-lg bg-hub-panel border transition-colors shadow-hub-card ${
+      className={`relative rounded-hub-lg bg-hub-panel border transition-all shadow-hub-card ${
         isTemp
           ? 'border-dashed border-amber-500/40 focus-within:border-amber-500/80'
           : 'border-hub-border focus-within:border-hub-accent/60'
@@ -131,6 +139,41 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
         >
           <SendIcon size={14} />
         </button>
+      </div>
+
+      {/* Live Token & Cost Estimator Bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-t border-hub-border/30 bg-black/20 text-[10.5px] text-hub-text-muted font-mono rounded-b-hub-lg">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1" title="Estimated prompt token count">
+            <GaugeIcon size={11} className="text-hub-text-muted" />
+            <strong className="text-hub-text font-normal">
+              {costEstimate.inputTokens.toLocaleString()}
+            </strong>{' '}
+            / {(costEstimate.contextLimit / 1000).toFixed(0)}k tokens
+          </span>
+
+          <span
+            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+              costEstimate.status === 'exceeded'
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                : costEstimate.status === 'warning'
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            }`}
+          >
+            {costEstimate.contextPercent}% ctx
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <CalculatorIcon size={11} className="text-hub-text-muted" />
+          <span>
+            Est. Cost:{' '}
+            <strong className="text-hub-text font-medium">
+              ${costEstimate.estimatedTotalCostUsd < 0.00001 ? '< $0.00001' : costEstimate.estimatedTotalCostUsd.toFixed(5)}
+            </strong>
+          </span>
+        </div>
       </div>
     </div>
   );

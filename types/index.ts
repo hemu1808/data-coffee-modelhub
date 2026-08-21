@@ -179,6 +179,111 @@ export interface VectorSearchResult {
   similarity: number;
 }
 
+export interface BM25Result {
+  chunk: DocumentChunk;
+  bm25Score: number;
+}
+
+export interface HybridSearchResult {
+  chunk: DocumentChunk;
+  denseSimilarity: number;
+  bm25Score: number;
+  rrfScore: number;
+  denseRank: number;
+  bm25Rank: number;
+  combinedScore: number;
+  relevanceExplanation?: string;
+}
+
+export interface RerankedChunk {
+  chunk: DocumentChunk;
+  originalScore: number;
+  rerankScore: number;
+  exactTermMatches: number;
+  densityScore: number;
+}
+
+/* ─── Live Cost & Token Estimator Types ─── */
+
+export interface ModelPricing {
+  modelId: string;
+  name: string;
+  provider: ProviderName;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+  contextWindowTokens: number;
+}
+
+export interface CostEstimate {
+  inputTokens: number;
+  contextLimit: number;
+  contextPercent: number;
+  estimatedInputCostUsd: number;
+  estimatedTotalCostUsd: number;
+  status: 'safe' | 'warning' | 'exceeded';
+}
+
+/* ─── Conversation Branch Tree Visualizer Types ─── */
+
+export interface BranchTreeNode {
+  id: string;
+  messageId: string;
+  role: 'user' | 'assistant' | 'system';
+  model?: string;
+  content: string;
+  snippet: string;
+  timestamp: string;
+  versionIndex: number;
+  totalVersions: number;
+  isActive: boolean;
+  parentId: string | null;
+  children: string[];
+  depth: number;
+  forkedFromChatId?: string;
+}
+
+export interface ConversationTreeData {
+  chatId: string;
+  title: string;
+  rootNodes: string[];
+  nodes: Record<string, BranchTreeNode>;
+  activeLeafId: string;
+}
+
+/* ─── Model Arena Blind ELO Types ─── */
+
+export type ArenaVoteType = 'modelA' | 'modelB' | 'tie' | 'both_bad';
+
+export interface EloRating {
+  modelId: string;
+  name: string;
+  provider: ProviderName;
+  elo: number;
+  matches: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  winRate: number;
+  lastUpdated: string;
+}
+
+export interface ArenaMatch {
+  id: string;
+  timestamp: string;
+  prompt: string;
+  modelAId: string;
+  modelBId: string;
+  modelAName: string;
+  modelBName: string;
+  winner: 'modelA' | 'modelB' | 'tie' | 'both_bad';
+  modelAOldElo: number;
+  modelANewElo: number;
+  modelBOldElo: number;
+  modelBNewElo: number;
+  deltaA: number;
+  deltaB: number;
+}
+
 /* ─── API Types ─── */
 
 export interface ChatRequest {
