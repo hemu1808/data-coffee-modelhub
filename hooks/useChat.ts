@@ -78,8 +78,18 @@ export function useChatCore() {
 
     addMessageToChat(targetChatId, initialAssistantMsg);
 
+    // Collect all documents uploaded in this chat session + any new pending attachments
+    const pastAttachments = (currentChat?.messages || []).flatMap((m) => m.attachments || []);
+    const combinedAttachmentsMap = new Map<string, any>();
+    [...pastAttachments, ...pendingAttachments].forEach((att) => {
+      if (att && att.name) {
+        combinedAttachmentsMap.set(att.name.toLowerCase(), att);
+      }
+    });
+    const activeAttachments = Array.from(combinedAttachmentsMap.values());
+
     try {
-      const historyContext = (currentChat?.messages || []).slice(-6).map((m) => ({
+      const historyContext = (currentChat?.messages || []).slice(-8).map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -89,7 +99,7 @@ export function useChatCore() {
           prompt: trimmed,
           model: selectedModelId,
           chatId: targetChatId,
-          attachments: pendingAttachments,
+          attachments: activeAttachments,
           apiKeys,
           history: historyContext,
         },
@@ -155,12 +165,17 @@ export function useChatCore() {
           content: m.content,
         }));
 
+        const chatAttachments = (currentChat?.messages || []).flatMap((m) => m.attachments || []);
+        const uniqueAttachments = Array.from(
+          new Map(chatAttachments.map((a) => [a.name.toLowerCase(), a])).values()
+        );
+
         await streamChatMessage(
           {
             prompt: newPrompt,
             model: selectedModelId,
             chatId: currentChatId,
-            attachments: currentChat?.messages[msgIndex]?.attachments,
+            attachments: uniqueAttachments,
             apiKeys,
             history: historyContext,
           },
@@ -213,12 +228,17 @@ export function useChatCore() {
           content: m.content,
         }));
 
+        const chatAttachments = (currentChat?.messages || []).flatMap((m) => m.attachments || []);
+        const uniqueAttachments = Array.from(
+          new Map(chatAttachments.map((a) => [a.name.toLowerCase(), a])).values()
+        );
+
         await streamChatMessage(
           {
             prompt: promptToUse,
             model: selectedModelId,
             chatId: currentChatId,
-            attachments: prevUserMsg?.attachments,
+            attachments: uniqueAttachments,
             apiKeys,
             history: historyContext,
           },

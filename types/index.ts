@@ -1,6 +1,6 @@
 export type AppView = 'chat' | 'billing' | 'collabs' | 'team-chats' | 'arena';
 
-export type ProviderName = 'Anthropic' | 'OpenAI' | 'Google';
+export type ProviderName = 'Anthropic' | 'OpenAI' | 'Google' | 'Azure';
 
 export type BillingPlanTier = 'Free' | 'Pro' | 'Team' | 'Enterprise';
 

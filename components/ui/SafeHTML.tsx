@@ -7,7 +7,7 @@ import { cn } from '../../lib/utils';
 interface SafeHTMLProps {
   html: string;
   className?: string;
-  as?: keyof JSX.IntrinsicElements;
+  as?: React.ElementType;
 }
 
 /**

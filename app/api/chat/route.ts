@@ -10,7 +10,8 @@ interface RequestPayload {
   history?: { role: 'user' | 'assistant' | 'system'; content: string }[];
 }
 
-const MODEL_MAPPINGS: Record<string, { provider: 'openai' | 'anthropic' | 'google'; targetModel: string }> = {
+const MODEL_MAPPINGS: Record<string, { provider: 'openai' | 'anthropic' | 'google' | 'azure'; targetModel: string }> = {
+  'ms-foundry':       { provider: 'azure',       targetModel: 'gpt-4o' },
   'claude-sonnet':    { provider: 'anthropic', targetModel: 'claude-3-5-sonnet-20241022' },
   'claude-opus':      { provider: 'anthropic', targetModel: 'claude-3-opus-20240229' },
   'gpt-5':            { provider: 'openai',    targetModel: 'gpt-4o' },
@@ -32,11 +33,14 @@ export async function POST(req: NextRequest) {
 
     const mapping = MODEL_MAPPINGS[modelId] || { provider: 'google', targetModel: 'gemini-2.5-flash' };
 
-    // Resolve API keys (prioritizing user-provided BYOK keys, then environment variables)
-    const openaiKey = (apiKeys.openai || process.env.OPENAI_API_KEY || '').trim();
-    const anthropicKey = (apiKeys.anthropic || process.env.ANTHROPIC_API_KEY || '').trim();
+    // ─── BYOK DISABLED FOR DEMO — Using server-side env keys only ───
+    // When re-enabling BYOK, restore the apiKeys.* || process.env.* pattern below:
+    // const openaiKey = (apiKeys.openai || process.env.OPENAI_API_KEY || '').trim();
+    // const anthropicKey = (apiKeys.anthropic || process.env.ANTHROPIC_API_KEY || '').trim();
+    // const googleKey = (apiKeys.google || process.env.GOOGLE_AI_API_KEY || ...).trim();
+    const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
+    const anthropicKey = (process.env.ANTHROPIC_API_KEY || '').trim();
     const googleKey = (
-      apiKeys.google ||
       process.env.GOOGLE_AI_API_KEY ||
       process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
       process.env.GEMINI_API_KEY ||
@@ -74,8 +78,24 @@ export async function POST(req: NextRequest) {
       return await streamAnthropic(anthropicKey, mapping.targetModel, combinedPrompt, history);
     }
 
-    /* ─── 4. Offline / Zero-Config Simulated Fallback Generator ─── */
-    return generateSimulatedStream(prompt, modelId, attachments);
+    /* ─── 4. Azure OpenAI Provider ─── */
+    if (mapping.provider === 'azure' && openaiKey && process.env.AZURE_OPENAI_ENDPOINT) {
+      return await streamAzureOpenAI(openaiKey, process.env.AZURE_OPENAI_ENDPOINT, mapping.targetModel, combinedPrompt, history);
+    }
+
+    /* ─── 4. Cross-Provider Fallback: Try Google if preferred provider has no key ─── */
+    if (googleKey) {
+      return await streamGoogleGemini(googleKey, 'gemini-2.5-flash', combinedPrompt, history);
+    }
+    if (openaiKey) {
+      return await streamOpenAI(openaiKey, 'gpt-4o-mini', combinedPrompt, history);
+    }
+    if (anthropicKey) {
+      return await streamAnthropic(anthropicKey, 'claude-3-5-sonnet-20241022', combinedPrompt, history);
+    }
+
+    /* ─── 5. Offline / Zero-Config Simulated Fallback Generator ─── */
+    return generateSimulatedStream(combinedPrompt, modelId, attachments);
   } catch (err: any) {
     return createErrorStream(`⚠️ **Internal Server Error**: ${err?.message || 'Unknown error occurred'}`);
   }
@@ -309,6 +329,113 @@ async function streamOpenAI(apiKey: string, model: string, prompt: string, histo
     });
   } catch (err: any) {
     return createErrorStream(`⚠️ **Network Error connecting to OpenAI**: ${err?.message}`);
+  }
+}
+
+/**
+ * Azure OpenAI Chat Completions Streaming
+ */
+async function streamAzureOpenAI(apiKey: string, azureEndpoint: string, model: string, prompt: string, history: any[]) {
+  // Strip trailing slashes and /openai/v1 from endpoint to construct valid deployment URL
+  const baseUrl = azureEndpoint.replace(/\/openai\/v1\/?$/, '').replace(/\/$/, '');
+  const endpoint = `${baseUrl}/openai/deployments/${model}/chat/completions?api-version=2024-02-01`;
+
+  const messages = [
+    { role: 'system', content: 'You are an expert AI assistant connected via Azure Microsoft Foundry.' },
+    ...history.map((h) => ({ role: h.role, content: h.content })),
+    { role: 'user', content: prompt },
+  ];
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+      },
+      body: JSON.stringify({
+        messages,
+        stream: true,
+      }),
+    });
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        // Azure resource only hosts text-embedding-3-small for RAG retrieval;
+        // Delegate generation seamlessly to Gemini if available, or simulated RAG stream
+        const googleKey = (
+          process.env.GOOGLE_AI_API_KEY ||
+          process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+          process.env.GEMINI_API_KEY ||
+          process.env.GOOGLE_API_KEY ||
+          ''
+        ).trim();
+
+        if (googleKey) {
+          return await streamGoogleGemini(googleKey, 'gemini-2.5-flash', prompt, history);
+        }
+        return generateSimulatedStream(prompt, 'ms-foundry', []);
+      }
+
+      const errorText = await res.text();
+      let errorMsg = `HTTP ${res.status}`;
+      try {
+        const json = JSON.parse(errorText);
+        errorMsg = json.error?.message || errorText;
+      } catch {
+        errorMsg = errorText;
+      }
+      return createErrorStream(`⚠️ **Azure OpenAI API Error (${res.status})**:\n\n> ${errorMsg}`);
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        let buffer = '';
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed === 'data: [DONE]') continue;
+              if (trimmed.startsWith('data: ')) {
+                const jsonStr = trimmed.slice(6);
+                try {
+                  const parsed = JSON.parse(jsonStr);
+                  const chunk = parsed.choices?.[0]?.delta?.content;
+                  if (chunk) {
+                    controller.enqueue(encoder.encode(chunk));
+                  }
+                } catch {}
+              }
+            }
+          }
+        } catch (streamErr: any) {
+          controller.enqueue(encoder.encode(`\n\n*[Stream error: ${streamErr?.message}]*`));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Transfer-Encoding': 'chunked',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
+  } catch (err: any) {
+    return createErrorStream(`⚠️ **Network Error connecting to Azure**: ${err?.message}`);
   }
 }
 

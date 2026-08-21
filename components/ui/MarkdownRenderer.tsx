@@ -182,11 +182,21 @@ function CitationBadge({ citation }: { citation: ParsedCitation }) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Find attachment matching document name
-    let matchedDoc = pendingAttachments.find((a) => a.name.toLowerCase() === citation.docName.toLowerCase());
+    // 1. Check current chat history attachments
+    const chats = useChatStore.getState().chats;
+    for (const chat of chats) {
+      for (const msg of chat.messages) {
+        const found = (msg.attachments || []).find((a) => a.name.toLowerCase() === citation.docName.toLowerCase());
+        if (found) {
+          matchedDoc = found;
+          break;
+        }
+      }
+      if (matchedDoc) break;
+    }
 
     if (!matchedDoc) {
-      // Check in workspaces
+      // 2. Check in workspaces
       for (const w of workspaces) {
         const found = w.documents.find((d) => d.name.toLowerCase() === citation.docName.toLowerCase());
         if (found) {

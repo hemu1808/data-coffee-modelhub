@@ -132,9 +132,12 @@ export async function generateEmbedding(text: string, apiKey?: string): Promise<
 
   if (apiKey) {
     try {
-      const endpoint = process.env.AZURE_OPENAI_ENDPOINT
-        ? `${process.env.AZURE_OPENAI_ENDPOINT}/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01`
-        : 'https://api.openai.com/v1/embeddings';
+      let endpoint = 'https://api.openai.com/v1/embeddings';
+      if (process.env.AZURE_OPENAI_ENDPOINT) {
+        // Strip trailing slash and any trailing /openai/v1 paths for Azure OpenAI
+        const baseUrl = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/openai\/v1\/?$/, '').replace(/\/$/, '');
+        endpoint = `${baseUrl}/openai/deployments/text-embedding-3-small/embeddings?api-version=2024-02-01`;
+      }
 
       const res = await fetch(endpoint, {
         method: 'POST',

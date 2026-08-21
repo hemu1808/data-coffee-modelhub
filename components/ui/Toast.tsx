@@ -51,7 +51,7 @@ const variantIcons: Record<ToastVariant, string> = {
 
 function ToastNotification({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) => void }) {
   const [isExiting, setIsExiting] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     timerRef.current = setTimeout(() => {

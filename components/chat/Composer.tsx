@@ -94,7 +94,7 @@ export function Composer({ input, setInput, onSend, isStreaming, isTemp = false 
           onChange={handleFileUpload}
           hidden
           multiple
-          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json,.ts,.js,.py"
+          accept=".pdf,.doc,.docx,.txt,.md,.csv,.tsv,.json,.ts,.tsx,.js,.jsx,.py,.rs,.go,.sql,.html,.css,.yaml,.yml"
         />
 
         <button
