@@ -182,6 +182,8 @@ function CitationBadge({ citation }: { citation: ParsedCitation }) {
     e.preventDefault();
     e.stopPropagation();
 
+    let matchedDoc: any = null;
+
     // 1. Check current chat history attachments
     const chats = useChatStore.getState().chats;
     for (const chat of chats) {

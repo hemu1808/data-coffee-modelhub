@@ -1,0 +1,86 @@
+# ─────────────────────────────────────────────────────────────
+# Azure Container App Deployment Specification
+# Data Coffee Model Hub
+#
+# Deploy via Azure CLI:
+#   az containerapp create --name data-coffee-modelhub \
+#     --resource-group rg-data-coffee \
+#     --yaml deploy/azure-container-app.yaml
+# ─────────────────────────────────────────────────────────────
+
+location: eastus
+name: data-coffee-modelhub
+resourceGroup: rg-data-coffee
+type: Microsoft.App/containerApps
+tags:
+  environment: production
+  project: data-coffee-modelhub
+
+properties:
+  managedEnvironmentId: /subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/rg-data-coffee/providers/Microsoft.App/managedEnvironments/env-data-coffee
+
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 3000
+      transport: auto
+      allowInsecure: false
+      traffic:
+        - latestRevision: true
+          weight: 100
+
+    secrets:
+      - name: openai-api-key
+        value: "<YOUR_AZURE_OPENAI_API_KEY>"
+      - name: google-ai-api-key
+        value: "<YOUR_GOOGLE_AI_API_KEY>"
+      - name: nextauth-secret
+        value: "<YOUR_SECURE_NEXTAUTH_SECRET>"
+
+  template:
+    containers:
+      - name: modelhub-web
+        image: <YOUR_ACR_NAME>.azurecr.io/data-coffee-modelhub:latest
+        resources:
+          cpu: 1.0
+          memory: 2.0Gi
+        env:
+          - name: NODE_ENV
+            value: production
+          - name: PORT
+            value: "3000"
+          - name: NEXTAUTH_URL
+            value: "https://data-coffee-modelhub.<YOUR_ENVIRONMENT_DOMAIN>.azurecontainerapps.io"
+          - name: NEXTAUTH_SECRET
+            secretRef: nextauth-secret
+          - name: AZURE_OPENAI_ENDPOINT
+            value: "https://data-coffee-persona.openai.azure.com/openai/v1"
+          - name: OPENAI_API_KEY
+            secretRef: openai-api-key
+          - name: GOOGLE_AI_API_KEY
+            secretRef: google-ai-api-key
+
+        probes:
+          - type: Liveness
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            failureThreshold: 3
+          - type: Readiness
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+    scale:
+      minReplicas: 1
+      maxReplicas: 5
+      rules:
+        - name: http-scaling-rule
+          http:
+            metadata:
+              concurrentRequests: "50"
